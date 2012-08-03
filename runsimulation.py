@@ -114,7 +114,13 @@ for i in range(len(col_range)):
                     sample_tree = sample_trees[k]
 
                 #setup all the matrices
-                matrix, sample_names = app.create_discrete_matrix(num_cols, sample_tree, bits, None)
+                matrix, sample_names = None
+                try:
+                    matrix, sample_names = app.create_discrete_matrix(num_cols, sample_tree, bits, None)
+                except Exception, err:
+                    sys.stderr.write('ERROR: %s\n' % str(err))
+                    exit(1)
+
                 gap = app.get_range_standardized_matrix_from_discrete(matrix, bits, num_cols)
                 abund = app.get_abundance_matrix(gap, ranges, dist)
                 gap2 = app.restandardize_matrix(abund, ranges)
