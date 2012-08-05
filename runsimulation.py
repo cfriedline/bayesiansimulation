@@ -114,9 +114,9 @@ for i in range(len(col_range)):
                     sample_tree = sample_trees[k]
 
                 #setup all the matrices
-                matrix, sample_names = None
+                matrix = sample_names = None
                 try:
-                    matrix, sample_names = app.create_discrete_matrix(num_cols, sample_tree, bits, None)
+                    matrix, sample_names = app.create_discrete_matrix(num_cols, sample_tree, bits)
                 except Exception, err:
                     sys.stderr.write('ERROR: %s\n' % str(err))
                     exit(1)

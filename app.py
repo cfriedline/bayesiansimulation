@@ -22,6 +22,7 @@ from scipy import stats
 __author__ = 'chris'
 log_file = None
 
+
 def clockit(func):
     """
     Function decorator that times the evaluation of *func* and prints the
@@ -181,11 +182,11 @@ def create_R(dir):
     """)
 
     r("""
-        get_valid_triplets = function(numsamples, needed, bits, thread) {
+        get_valid_triplets = function(numsamples, needed, bits, pid) {
             m = generate_triplet(bits)
             while (ncol(m) < needed) {
                 m = cbind(m, generate_triplet(bits))
-                print(paste("thread ", thread, " ", ncol(m), "/", needed, sep=""))
+                print(paste("process ", pid, " ", ncol(m), "/", needed, sep=""))
             }
             return(m)
         }
@@ -263,9 +264,8 @@ def __get_valid_triplets(num_samples, num_triplets, bits, thread_id):
     log("\tthread %d complete (%s)" % (thread_id, str(timer)), log_file)
     return r[name], name
 
-
 @clockit
-def create_discrete_matrix(num_cols, sample_tree, bits, pool):
+def create_discrete_matrix(num_cols, sample_tree, bits):
     """
     Creates a discrete char matrix from a tree
     @param num_cols: number of columns to create
@@ -285,8 +285,7 @@ def create_discrete_matrix(num_cols, sample_tree, bits, pool):
     r('m = matrix(nrow=length(tree$tip.label))') #create empty matrix
     r('m = m[,-1]') #drop the first NA column
     procs = mp.cpu_count()
-    if pool is None:
-        pool = mp.Pool(procs)
+    pool = mp.Pool(procs)
     args = []
     div, mod = divmod(usable_cols, procs)
     [args.append(div) for i in range(procs)]
@@ -296,7 +295,7 @@ def create_discrete_matrix(num_cols, sample_tree, bits, pool):
         args[-1] += mod
         args[i] -= mod
     results = [pool.apply_async(__get_valid_triplets, (num_samples, num, bits, i)) for i, num in enumerate(args)]
-
+    pool.close()
     finished = []
     for result in results:
         finished.append(result.get())
@@ -314,7 +313,7 @@ def create_discrete_matrix(num_cols, sample_tree, bits, pool):
 
     paralin_matrix, valid = __create_paralin_matrix(a)
     if valid is False:
-        return create_discrete_matrix(num_cols, sample_tree, bits, pool)
+        return create_discrete_matrix(num_cols, sample_tree, bits)
     else:
         robjects.globalenv['paralin_matrix'] = paralin_matrix
         r('rownames(paralin_matrix) = rownames(m)')
@@ -677,16 +676,16 @@ def output_matrix(data, folder, file_name, is_r):
     @param file_name: the filename
     @param is_r: whether the matrix is from rpy2
     """
-    f = open(os.path.join(folder, file_name), 'w')
-    if is_r is False:
-        for row in data:
-            line = '\t'.join([str(int(num)) for num in row])
-            f.write(line + "\n")
-    else:
-        assert isinstance(data, robjects.Matrix)
-        for i in xrange(data.nrow):
-            line = '\t'.join([str(int(num)) for num in data.rx(i + 1, True)])
-            f.write(line + '\n')
+    with open(os.path.join(folder, file_name), 'w') as f:
+        if is_r is False:
+            for row in data:
+                line = '\t'.join([str(int(num)) for num in row])
+                f.write(line + "\n")
+        else:
+            assert isinstance(data, robjects.Matrix)
+            for i in xrange(data.nrow):
+                line = '\t'.join([str(int(num)) for num in data.rx(i + 1, True)])
+                f.write(line + '\n')
 
 
 def create_mrbayes_file(file, matrix, sample_names, num_cols, n_gen):
