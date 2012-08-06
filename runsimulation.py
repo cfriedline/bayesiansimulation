@@ -6,6 +6,7 @@ import app
 import datetime
 import stopwatch
 import sys
+import traceback
 
 sys.setrecursionlimit(100000000)
 timer = stopwatch.Timer()
@@ -129,6 +130,7 @@ for i in range(len(col_range)):
                         sample_tree = sample_tree2
                 except Exception, err:
                     sys.stderr.write('ERROR! %s\n' % str(err))
+                    traceback.print_exc()
                     exit(1)
 
                 gap = app.get_range_standardized_matrix_from_discrete(matrix, bits, num_cols)
