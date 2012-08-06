@@ -124,7 +124,9 @@ def make_tree_binary(tree_string):
     tree = r('multi2di(read.tree(text=temptree))')
     f = tempfile.NamedTemporaryFile()
     r['write.nexus'](tree, file=f.name)
-    return dendropy.Tree.get_from_path(f.name, "nexus")
+    tree = dendropy.Tree.get_from_path(f.name, "nexus")
+    f.close()
+    return tree
 
 
 def get_paralinear_cluster():
@@ -137,8 +139,9 @@ def get_paralinear_cluster():
     tree = r('multi2di(as.phylo(paralinear_cluster))')
     f = tempfile.NamedTemporaryFile()
     r['write.nexus'](tree, file=f.name)
-
-    return dendropy.Tree.get_from_path(f.name, "nexus")
+    tree = dendropy.Tree.get_from_path(f.name, "nexus")
+    f.close()
+    return tree
 
 
 def create_dir(dir):
@@ -265,7 +268,7 @@ def __get_valid_triplets(num_samples, num_triplets, bits, thread_id):
     return r[name], name
 
 @clockit
-def create_discrete_matrix(num_cols, sample_tree, bits):
+def create_discrete_matrix(num_cols, num_samples, sample_tree, bits):
     """
     Creates a discrete char matrix from a tree
     @param num_cols: number of columns to create
@@ -313,13 +316,14 @@ def create_discrete_matrix(num_cols, sample_tree, bits):
 
     paralin_matrix, valid = __create_paralin_matrix(a)
     if valid is False:
-        return create_discrete_matrix(num_cols, sample_tree, bits)
+        sample_tree = create_tree(num_samples, type="S")
+        return create_discrete_matrix(num_cols, num_samples, sample_tree, bits)
     else:
         robjects.globalenv['paralin_matrix'] = paralin_matrix
         r('rownames(paralin_matrix) = rownames(m)')
         r('paralin_dist = as.dist(paralin_matrix, diag=T, upper=T)')
         r("paralinear_cluster = hclust(paralin_dist, method='average')")
-    return a, n
+    return sample_tree, a, n
 
 
 @clockit
@@ -754,7 +758,6 @@ def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, 
     tree.is_rooted = False
     return tree
 
-
 def calculate_differences_r(orig_tree, test_tree):
     """
     Calcs differences between two trees in R
@@ -938,7 +941,9 @@ def ape_to_dendropy(phylo):
     """
     f = tempfile.NamedTemporaryFile()
     robjects.r['write.nexus'](phylo, file=f.name)
-    return dendropy.Tree.get_from_path(f.name, "nexus")
+    tree = dendropy.Tree.get_from_path(f.name, "nexus")
+    f.close()
+    return tree
 
 
 def dendropy_to_cogent(tree):

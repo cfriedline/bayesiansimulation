@@ -10,8 +10,7 @@ import sys
 sys.setrecursionlimit(100000000)
 timer = stopwatch.Timer()
 
-locs = ['local', 'phylogeny', 'godel']
-loc = locs[0]
+hostname = os.uname()[1]
 
 num_runs = 1
 
@@ -39,16 +38,23 @@ mb = "/Users/chris/src/mrbayes_3.2.1/src/mb"
 procs = 4
 project_dir = "/Users/chris/projects/bayessim"
 
-if loc == 'godel':
+if 'godel' in hostname:
     mpi = '/test/riveralab/cfriedline/bin/mpirun'
     mb = '/test/riveralab/cfriedline/src/mrbayes_3.2.1/src/mb'
     procs = 8
     project_dir = '/test/riveralab/cfriedline/projects/bsim'
-elif loc == 'phylogeny':
-    mpi = '/usr/bin/mpirun'
+elif 'phylogeny' in hostname:
+    mpi = '/usr/local/bin/mpirun'
     mb = '/home/cfriedline/src/mrbayes_3.2.1/src/mb'
     procs = 8
     project_dir = '/home/cfriedline/projects/bsim'
+
+if not 'local' in hostname:
+    col_start = 600
+    col_end = 12001
+    col_inc = 600
+    col_range = range(col_start, col_end, col_inc)
+    num_runs = 10
 
 run_dir_name = datetime.datetime.now().strftime("%m%d%y_%H%M%S")
 result_dir = app.create_dir(os.path.join(project_dir, "results"))
@@ -116,9 +122,13 @@ for i in range(len(col_range)):
                 #setup all the matrices
                 matrix = sample_names = None
                 try:
-                    matrix, sample_names = app.create_discrete_matrix(num_cols, sample_tree, bits)
+                    sample_tree2, matrix, sample_names = app.create_discrete_matrix(num_cols, num_samples, sample_tree, bits)
+                    if sample_tree2 != sample_tree:
+                        assert app.is_binary_tree(sample_tree2) == True
+                        sample_trees[k] = sample_tree2
+                        sample_tree = sample_tree2
                 except Exception, err:
-                    sys.stderr.write('ERROR: %s\n' % str(err))
+                    sys.stderr.write('ERROR! %s\n' % str(err))
                     exit(1)
 
                 gap = app.get_range_standardized_matrix_from_discrete(matrix, bits, num_cols)
@@ -218,4 +228,6 @@ for i in range(len(col_range)):
     app.log("\t%d cols in %s" % (num_cols, str(timer)), log_file)
 app.close_R()
 timer.stop()
+log_file.close()
+out_file.close()
 print "Done in %s " % str(timer)
