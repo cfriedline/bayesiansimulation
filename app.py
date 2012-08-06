@@ -177,7 +177,7 @@ def create_R(dir):
         triplet = replicate(bits, rTraitDisc(tree, model="ER", k=2,states=0:1))
         triplet = t(apply(triplet, 1, as.numeric))
         sums = rowSums(triplet)
-        if (length(which(sums==0)) > 0 && length(which(sums==3)) > 0) {
+        if (length(which(sums==0)) > 0 && length(which(sums==3)) == 1) {
             return(triplet)
         }
         return(generate_triplet(bits))
