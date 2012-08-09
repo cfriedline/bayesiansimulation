@@ -1,6 +1,7 @@
 import os
 import random
 import string
+import traceback
 import numpy
 from subprocess import  Popen, PIPE, STDOUT
 import dendropy
@@ -13,6 +14,10 @@ from rpy2.robjects import numpy2ri
 import math
 import stopwatch
 import multiprocessing as mp
+from multiprocessing import Pool, current_process, Manager
+
+#mp_logger = mp.log_to_stderr()
+#mp_logger.setLevel(mp.SUBDEBUG)
 
 numpy2ri.activate()
 from cogent import LoadTree
@@ -81,11 +86,11 @@ def calculate_unifrac(abund, sample_names, taxa_tree):
     """
     unifrac_dict = __create_unifrac_dict(abund, sample_names, taxa_tree)
     tree = dendropy_to_cogent(taxa_tree)
-    unweighted = fast_unifrac(tree, unifrac_dict, modes={UNIFRAC_DIST_MATRIX}, is_symmetric=True, weighted=False)
+    unweighted = fast_unifrac(tree, unifrac_dict, modes = {UNIFRAC_DIST_MATRIX}, is_symmetric = True, weighted = False)
     un_matrix = unweighted[UNIFRAC_DIST_MATRIX][0]
     un_rows = unweighted[UNIFRAC_DIST_MATRIX][1]
 
-    weighted = fast_unifrac(tree, unifrac_dict, modes={UNIFRAC_DIST_MATRIX}, is_symmetric=True, weighted=True)
+    weighted = fast_unifrac(tree, unifrac_dict, modes = {UNIFRAC_DIST_MATRIX}, is_symmetric = True, weighted = True)
     w_matrix = weighted[UNIFRAC_DIST_MATRIX][0]
     w_rows = weighted[UNIFRAC_DIST_MATRIX][1]
     return (un_matrix, un_rows), (w_matrix, w_rows)
@@ -123,7 +128,7 @@ def make_tree_binary(tree_string):
     robjects.globalenv['temptree'] = tree_string + ";"
     tree = r('multi2di(read.tree(text=temptree))')
     f = tempfile.NamedTemporaryFile()
-    r['write.nexus'](tree, file=f.name)
+    r['write.nexus'](tree, file = f.name)
     tree = dendropy.Tree.get_from_path(f.name, "nexus")
     f.close()
     return tree
@@ -138,7 +143,7 @@ def get_paralinear_cluster():
     r = robjects.r
     tree = r('multi2di(as.phylo(paralinear_cluster))')
     f = tempfile.NamedTemporaryFile()
-    r['write.nexus'](tree, file=f.name)
+    r['write.nexus'](tree, file = f.name)
     tree = dendropy.Tree.get_from_path(f.name, "nexus")
     f.close()
     return tree
@@ -185,13 +190,14 @@ def create_R(dir):
     """)
 
     r("""
-        get_valid_triplets = function(numsamples, needed, bits, pid) {
-            m = generate_triplet(bits)
-            while (ncol(m) < needed) {
-                m = cbind(m, generate_triplet(bits))
-                print(paste("process ", pid, " ", ncol(m), "/", needed, sep=""))
-            }
+        get_valid_triplets = function(numsamples, needed, bits) {
+            tryCatch({
+                m = generate_triplet(bits)
+                while (ncol(m) < needed) {
+                    m = cbind(m, generate_triplet(bits))
+                }
             return(m)
+            }, error = function(e){print(message(e))}, warning = function(e){print(message(e))})
         }
     """)
 
@@ -218,7 +224,7 @@ def __create_paralin_matrix(a):
     @rtype tuple
     """
     assert isinstance(a, robjects.Matrix)
-    dist = numpy.zeros(shape=(a.nrow, a.nrow))
+    dist = numpy.zeros(shape = (a.nrow, a.nrow))
     valid = True
     for i in xrange(a.nrow):
         for j in range(i + 1):
@@ -239,9 +245,9 @@ def get_paralin_distance(seq1, seq2):
     @return: the paralinear distance
     @rtype: float
     """
-    j = numpy.zeros(shape=(2, 2))
-    d1 = numpy.zeros(shape=(2, 2))
-    d2 = numpy.zeros(shape=(2, 2))
+    j = numpy.zeros(shape = (2, 2))
+    d1 = numpy.zeros(shape = (2, 2))
+    d2 = numpy.zeros(shape = (2, 2))
     for pos, c in enumerate(seq1):
         c1 = int(c)
         c2 = int(seq2[pos])
@@ -257,15 +263,72 @@ def get_paralin_distance(seq1, seq2):
     return d
 
 
-def __get_valid_triplets(num_samples, num_triplets, bits, thread_id):
+def __ret_valid_triplets(results):
+    return results
+
+
+def __get_valid_triplets(num_samples, num_triplets, bits, q):
+    try:
+        r = robjects.r
+        name = current_process().name.replace("-", "_")
+        timer = stopwatch.Timer()
+        log("\trunning %s (%d triplets), pid %d, ppid %d" % (name, num_triplets, current_process().pid, os.getppid()),
+            log_file)
+        r('%s = get_valid_triplets(%d, %d, %d)' % (name, num_samples, num_triplets, bits))
+        q.put((name, r[name]))
+        timer.stop()
+        log("\t%s complete (%s)" % (name, str(timer)), log_file)
+    except Exception, e:
+        q.put("DEATH")
+        traceback.print_exc()
+
+def __generate_candidate_discrete_matrix(num_cols, num_samples, sample_tree, bits, usable_cols):
+    assert isinstance(sample_tree, dendropy.Tree)
+    print "Creating discrete character matrix"
     r = robjects.r
-    name = __get_random_string(20)
-    timer = stopwatch.Timer()
-    log("\trunning thread %d (%d triplets)" % (thread_id, num_triplets), log_file)
-    r('%s = get_valid_triplets(%d, %d, %d, %d)' % (name, num_samples, num_triplets, bits, thread_id))
-    timer.stop()
-    log("\tthread %d complete (%s)" % (thread_id, str(timer)), log_file)
-    return r[name], name
+    newick = sample_tree.as_newick_string()
+    num_samples = len(sample_tree.leaf_nodes())
+    robjects.globalenv['numcols'] = usable_cols
+    robjects.globalenv['newick'] = newick + ";"
+    r("tree = read.tree(text=newick)")
+    r('m = matrix(nrow=length(tree$tip.label))') #create empty matrix
+    r('m = m[,-1]') #drop the first NA column
+    num_procs = mp.cpu_count()
+    args = []
+    div, mod = divmod(usable_cols, num_procs)
+    [args.append(div) for i in range(num_procs)]
+    args[-1] += mod
+    for i, elem in enumerate(args):
+        div, mod = divmod(elem, bits)
+        args[-1] += mod
+        args[i] -= mod
+    manager = Manager()
+    pool = Pool(processes=num_procs, maxtasksperchild=1)
+    q = manager.Queue(maxsize=num_procs)
+    for arg in args:
+        pool.apply_async(__get_valid_triplets, (num_samples, arg, bits, q))
+    pool.close()
+    pool.join()
+
+    while not q.empty():
+        name = data = None
+        q_data = q.get()
+        if q_data == 'DEATH':
+            print "Something bad happened!"
+            traceback.print_exc()
+            exit(1)
+        else:
+            name, data = q_data
+        robjects.globalenv[name] = data
+        r('m = cbind(m, %s)' % name)
+
+    r('m = m[,1:%d]' % usable_cols)
+    r('m = m[order(rownames(m)),]') # consistently order the rows (for unifrac compatibility)
+    r('m = t(apply(m, 1, as.numeric))') # convert all factors given by rTraitDisc to numeric
+    a = r['m']
+    n = r('rownames(m)')
+    return a, n
+
 
 @clockit
 def create_discrete_matrix(num_cols, num_samples, sample_tree, bits):
@@ -276,47 +339,15 @@ def create_discrete_matrix(num_cols, num_samples, sample_tree, bits):
     @return: a r object of the matrix, and a list of the row names
     @rtype: tuple(robjects.Matrix, list)
     """
-    assert isinstance(sample_tree, dendropy.Tree)
-    print "Creating discrete character matrix"
     r = robjects.r
-    newick = sample_tree.as_newick_string()
-    num_samples = len(sample_tree.leaf_nodes())
     usable_cols = find_usable_length(num_cols, bits)
-    robjects.globalenv['numcols'] = usable_cols
-    robjects.globalenv['newick'] = newick + ";"
-    r("tree = read.tree(text=newick)")
-    r('m = matrix(nrow=length(tree$tip.label))') #create empty matrix
-    r('m = m[,-1]') #drop the first NA column
-    procs = mp.cpu_count()
-    pool = mp.Pool(procs)
-    args = []
-    div, mod = divmod(usable_cols, procs)
-    [args.append(div) for i in range(procs)]
-    args[-1] += mod
-    for i, elem in enumerate(args):
-        div, mod = divmod(elem, bits)
-        args[-1] += mod
-        args[i] -= mod
-    results = [pool.apply_async(__get_valid_triplets, (num_samples, num, bits, i)) for i, num in enumerate(args)]
-    pool.close()
-    finished = []
-    for result in results:
-        finished.append(result.get())
-    for result in finished:
-        robjects.globalenv[result[1]] = result[0]
-        r('m = cbind(m, %s)' % result[1])
-    r('m = m[,1:%d]' % usable_cols)
-    r('m = m[order(rownames(m)),]') # consistently order the rows (for unifrac compatibility)
-    r('m = t(apply(m, 1, as.numeric))') # convert all factors given by rTraitDisc to numeric
-    a = r['m']
-    n = r('rownames(m)')
-
+    a, n = __generate_candidate_discrete_matrix(num_cols, num_samples, sample_tree, bits, usable_cols)
     assert isinstance(a, robjects.Matrix)
     assert a.ncol == usable_cols
 
     paralin_matrix, valid = __create_paralin_matrix(a)
     if valid is False:
-        sample_tree = create_tree(num_samples, type="S")
+        sample_tree = create_tree(num_samples, type = "S")
         return create_discrete_matrix(num_cols, num_samples, sample_tree, bits)
     else:
         robjects.globalenv['paralin_matrix'] = paralin_matrix
@@ -407,7 +438,7 @@ def get_random_min_and_max_from_normal(mean, sd, smallest_max):
     max = get_random_from_normal(mean, sd)
     while max < smallest_max:
         max = get_random_from_normal(mean, sd)
-    smallest_max = round(numpy.random.uniform(low=0.0, high=max / 8.0))
+    smallest_max = round(numpy.random.uniform(low = 0.0, high = max / 8.0))
     return smallest_max, max
 
 
@@ -422,7 +453,7 @@ def get_random_min_and_max_from_gamma(gamma_shape, gamma_scale, min):
     max = get_random_from_gamma(gamma_shape, gamma_scale)
     while max < min:
         max = get_random_from_gamma(gamma_shape, gamma_scale)
-    min = round(numpy.random.uniform(low=0.0, high=max / 8.0))
+    min = round(numpy.random.uniform(low = 0.0, high = max / 8.0))
     return min, max
 
 
@@ -546,7 +577,7 @@ def get_random_abundance(weight, abund, max, min, max_char):
     @rypte: int
     """
     r = find_range(weight, abund, max, min, max_char)
-    return round(numpy.random.uniform(low=r[0], high=r[1]))
+    return round(numpy.random.uniform(low = r[0], high = r[1]))
 
 
 @clockit
@@ -607,7 +638,7 @@ def restandardize_matrix(abund, ranges):
             if range[0] == range[1]:
                 raise Exception("dupe range found at row %d %s" % (i, range), [row[j] for row in abund])
             if range[1] > 0:
-                data[i][j] = compute_weight(max_char=7, abund=val, max=range[1], min=range[0])
+                data[i][j] = compute_weight(max_char = 7, abund = val, max = range[1], min = range[0])
             else:
                 data[i][j] = 0
     return data
@@ -746,7 +777,7 @@ def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, 
     cmd = [mpi, "-np", procs, mb, os.path.abspath(mb_file)]
     cmd_string = " ".join([str(elem) for elem in cmd])
     print cmd_string
-    p = Popen(cmd_string, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT, close_fds=True)
+    p = Popen(cmd_string, shell = True, stdin = PIPE, stdout = PIPE, stderr = STDOUT, close_fds = True)
     p.communicate()
     #    for line in iter(p.stdout.readline, ''):
     #        print line.rstrip()
@@ -757,6 +788,7 @@ def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, 
     assert isinstance(tree, dendropy.Tree)
     tree.is_rooted = False
     return tree
+
 
 def calculate_differences_r(orig_tree, test_tree):
     """
@@ -940,7 +972,7 @@ def ape_to_dendropy(phylo):
     @rtype: dendropy.Tree
     """
     f = tempfile.NamedTemporaryFile()
-    robjects.r['write.nexus'](phylo, file=f.name)
+    robjects.r['write.nexus'](phylo, file = f.name)
     tree = dendropy.Tree.get_from_path(f.name, "nexus")
     f.close()
     return tree
@@ -954,7 +986,7 @@ def dendropy_to_cogent(tree):
     @rtype: cogent.Tree
     """
     assert isinstance(tree, dendropy.Tree)
-    ctree = LoadTree(treestring=tree.as_newick_string())
+    ctree = LoadTree(treestring = tree.as_newick_string())
     return ctree
 
 

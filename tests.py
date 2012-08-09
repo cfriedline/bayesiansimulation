@@ -13,11 +13,13 @@ class Tester(unittest.TestCase):
         assert round(app.get_paralin_distance(self.t1, self.t2), 4) == 1.0617
 
     def test_weight(self):
-        max = 1000
-        min = 50
-        assert app.compute_weight(7, max, max, min) == 7
-        assert app.compute_weight(7, min, max, min) == 0
-        app.compute_weight(7, max-1, max, min) == 6
+        max_char = 7
+        max = 10000
+        min = 0
+        assert app.compute_weight(max_char, max, max, min) == 7
+        assert app.compute_weight(max_char, min, max, min) == 0
+        assert app.compute_weight(max_char, max - 1, max, min) == 6
+        assert app.compute_weight(max_char, min + 1, max, min) == 0
 
 
 

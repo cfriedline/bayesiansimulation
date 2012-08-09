@@ -7,13 +7,15 @@ import datetime
 import stopwatch
 import sys
 import traceback
+from multiprocessing import Manager, Pool
+import multiprocessing as mp
 
-sys.setrecursionlimit(100000000)
+sys.setrecursionlimit(100000)
 timer = stopwatch.Timer()
 
 hostname = os.uname()[1]
 
-num_runs = 1
+num_runs = 10
 
 bits = 3
 
@@ -43,7 +45,7 @@ if 'godel' in hostname:
     mpi = '/test/riveralab/cfriedline/bin/mpirun'
     mb = '/test/riveralab/cfriedline/src/mrbayes_3.2.1/src/mb'
     procs = 8
-    project_dir = '/test/riveralab/cfriedline/projects/bsim'
+    project_dir = '/test/riveralab/cfriedline/projects/bsim2'
 elif 'phylogeny' in hostname:
     mpi = '/usr/local/bin/mpirun'
     mb = '/home/cfriedline/src/mrbayes_3.2.1/src/mb'
@@ -82,7 +84,6 @@ out_file.write("num_samples,num_cols,dist,"
 print "Running %s runs each for %s samples and %s cols" % (num_runs, sample_range, col_range)
 
 app.create_R(out_dir)
-
 all_results = []
 completed = 0
 smallest_max_otu_value = app.compute_smallest_max()
@@ -123,7 +124,8 @@ for i in range(len(col_range)):
                 #setup all the matrices
                 matrix = sample_names = None
                 try:
-                    sample_tree2, matrix, sample_names = app.create_discrete_matrix(num_cols, num_samples, sample_tree, bits)
+                    sample_tree2, matrix, sample_names = app.create_discrete_matrix(num_cols,
+                        num_samples, sample_tree, bits)
                     if sample_tree2 != sample_tree:
                         assert app.is_binary_tree(sample_tree2) == True
                         sample_trees[k] = sample_tree2
