@@ -7,8 +7,6 @@ import datetime
 import stopwatch
 import sys
 import traceback
-from multiprocessing import Manager, Pool
-import multiprocessing as mp
 
 sys.setrecursionlimit(100000)
 timer = stopwatch.Timer()
@@ -89,7 +87,7 @@ completed = 0
 smallest_max_otu_value = app.compute_smallest_max()
 for i in range(len(col_range)):
     num_cols = col_range[i]
-    taxa_tree = app.create_tree(app.find_usable_length(num_cols, bits) / bits, type='T')
+    taxa_tree = app.create_tree(app.find_usable_length(num_cols, bits) / bits, type = 'T')
     assert app.is_binary_tree(taxa_tree) == True
     for j in range(len(sample_range)):
         num_samples = sample_range[j]
@@ -115,7 +113,7 @@ for i in range(len(col_range)):
 
                 #create the sample tree, if not already there and save for next distribution
                 if sample_trees[k] is None:
-                    sample_tree = app.create_tree(num_samples, type='S')
+                    sample_tree = app.create_tree(num_samples, type = 'S')
                     assert app.is_binary_tree(sample_tree) == True
                     sample_trees[k] = sample_tree
                 else:
@@ -125,7 +123,7 @@ for i in range(len(col_range)):
                 matrix = sample_names = None
                 try:
                     sample_tree2, matrix, sample_names = app.create_discrete_matrix(num_cols,
-                        num_samples, sample_tree, bits)
+                                                                                    num_samples, sample_tree, bits)
                     if sample_tree2 != sample_tree:
                         assert app.is_binary_tree(sample_tree2) == True
                         sample_trees[k] = sample_tree2
@@ -144,7 +142,7 @@ for i in range(len(col_range)):
 
                 #do unifrac in python (PyCogent)
                 (u_uni_matrix, u_uni_rownames), (w_uni_matix, w_uni_names) = app.calculate_unifrac(abund, sample_names,
-                    taxa_tree)
+                                                                                                   taxa_tree)
                 #unweighted
                 u_unifrac_cluster_tree = app.get_py_unifrac_cluster(u_uni_matrix, u_uni_rownames)
                 assert app.is_binary_tree(u_unifrac_cluster_tree) == True
@@ -159,10 +157,10 @@ for i in range(len(col_range)):
 
                 # do mrbayes
                 mb_tree = app.run_mrbayes(k, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, run_dir,
-                    num_samples, "orig")
+                                          num_samples, "orig")
                 assert app.is_binary_tree(mb_tree) == True
                 mb_tree2 = app.run_mrbayes(k, matrix2, sample_names, num_cols, n_gen, mpi, mb, procs, dist, run_dir,
-                    num_samples, "recon")
+                                           num_samples, "recon")
                 assert app.is_binary_tree(mb_tree2) == True
 
                 # do paralinear/average linkage
@@ -210,9 +208,9 @@ for i in range(len(col_range)):
                 results.print_results(out_file)
                 out1 = open(os.path.join(log_dir, "origtree_%d_%d_%d.tre" % (num_samples, num_cols, k)), "w")
                 out2 = open(os.path.join(log_dir, "mbtree_orig_%d_%d_%s_%d.tre" % (num_samples, num_cols, dist, k)),
-                    "w")
+                            "w")
                 out3 = open(os.path.join(log_dir, "mbtree_recon_%d_%d_%s_%d.tre" % (num_samples, num_cols, dist, k)),
-                    "w")
+                            "w")
 
                 #out3 = open(os.path.join(log_dir, "unitree_%d_%d_%s_%d.tre" % (num_samples, num_cols, dist, k)), "w")
                 writers = [out1, out2, out3]
@@ -222,9 +220,10 @@ for i in range(len(col_range)):
 
                 #out3.write(r_unifrac_cluster_tree.as_newick_string() + ";\n")
                 app.print_trees_to_pdf(taxa_tree, sample_tree, mb_tree, mb_tree2,
-                    u_unifrac_cluster_tree, w_unifrac_cluster_tree,
-                    results.mb_orig_diff, results.mb_recon_diff, results.u_uni_cluster_diff, results.w_uni_cluster_diff,
-                    dist, k)
+                                       u_unifrac_cluster_tree, w_unifrac_cluster_tree,
+                                       results.mb_orig_diff, results.mb_recon_diff, results.u_uni_cluster_diff,
+                                       results.w_uni_cluster_diff,
+                                       dist, k)
                 [i.close() for i in writers]
                 completed += 1
             app.log("\t%d %s iters done in %s" % (num_runs, dist, str(timer)), log_file)
