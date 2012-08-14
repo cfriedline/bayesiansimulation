@@ -181,29 +181,21 @@ def create_R(dir):
     r("par(mfrow=c(2,3))")
 
     r("""
-        generate_first_triplet = function(bits) {
-        triplet = replicate(bits, rTraitDisc(tree, model="ER", k=2,states=0:1))
-        triplet = t(apply(triplet, 1, as.numeric))
-        sums = rowSums(triplet)
-        if (length(which(sums==0)) > 0 && length(which(sums==3)) == 1) {
-            return(triplet)
-        }
-        return(generate_first_triplet(bits))
-        }
-    """)
-
-    r("""
         get_valid_triplets = function(numsamples, needed, bits) {
+            #needed is needed cols, not needed triplets, so + bits b/c generating bit-lets
             tryCatch({
-                m = generate_first_triplet(bits)
-                found = 1
+                found = 0
                 while (found < needed) {
                     triplet = replicate(bits, rTraitDisc(tree, model="ER", k=2,states=0:1))
                     triplet = t(apply(triplet, 1, as.numeric))
                     sums = rowSums(triplet)
                     if (length(which(sums==0)) > 0 && length(which(sums==3)) == 1) {
-                        m = cbind(m, triplet)
-                        found = found + 1
+                        if (found == 0) {
+                            m = triplet
+                        } else {
+                            m = cbind(m, triplet)
+                        }
+                        found = found + bits
                     }
 
                 }
@@ -283,7 +275,7 @@ def __get_valid_triplets(num_samples, num_triplets, bits, q):
         r = robjects.r
         name = current_process().name.replace("-", "_")
         timer = stopwatch.Timer()
-        log("\trunning %s (%d triplets), pid %d, ppid %d" % (name, num_triplets, current_process().pid, os.getppid()),
+        log("\trunning %s (%d cols/%d triplets), pid %d, ppid %d" % (name, num_triplets, num_triplets/bits, current_process().pid, os.getppid()),
             log_file)
         r('%s = get_valid_triplets(%d, %d, %d)' % (name, num_samples, num_triplets, bits))
         q.put((name, r[name]))
