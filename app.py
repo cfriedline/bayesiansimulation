@@ -2,6 +2,9 @@ import os
 import random
 import string
 import traceback
+import rpy2.rinterface as rinterface
+rinterface.set_initoptions(('rpy2', '--vanilla', '--max-ppsize=500000'))
+
 import numpy
 from subprocess import  Popen, PIPE, STDOUT
 import dendropy
@@ -178,23 +181,31 @@ def create_R(dir):
     r("par(mfrow=c(2,3))")
 
     r("""
-        generate_triplet = function(bits) {
+        generate_first_triplet = function(bits) {
         triplet = replicate(bits, rTraitDisc(tree, model="ER", k=2,states=0:1))
         triplet = t(apply(triplet, 1, as.numeric))
         sums = rowSums(triplet)
         if (length(which(sums==0)) > 0 && length(which(sums==3)) == 1) {
             return(triplet)
         }
-        return(generate_triplet(bits))
+        return(generate_first_triplet(bits))
         }
     """)
 
     r("""
         get_valid_triplets = function(numsamples, needed, bits) {
             tryCatch({
-                m = generate_triplet(bits)
-                while (ncol(m) < needed) {
-                    m = cbind(m, generate_triplet(bits))
+                m = generate_first_triplet(bits)
+                found = 1
+                while (found < needed) {
+                    triplet = replicate(bits, rTraitDisc(tree, model="ER", k=2,states=0:1))
+                    triplet = t(apply(triplet, 1, as.numeric))
+                    sums = rowSums(triplet)
+                    if (length(which(sums==0)) > 0 && length(which(sums==3)) == 1) {
+                        m = cbind(m, triplet)
+                        found = found + 1
+                    }
+
                 }
             return(m)
             }, error = function(e){print(message(e))}, warning = function(e){print(message(e))})
@@ -314,9 +325,7 @@ def __generate_candidate_discrete_matrix(num_cols, num_samples, sample_tree, bit
         name = data = None
         q_data = q.get()
         if q_data == 'DEATH':
-            print "Something bad happened!"
-            traceback.print_exc()
-            exit(1)
+            return None, None
         else:
             name, data = q_data
         robjects.globalenv[name] = data
@@ -342,6 +351,12 @@ def create_discrete_matrix(num_cols, num_samples, sample_tree, bits):
     r = robjects.r
     usable_cols = find_usable_length(num_cols, bits)
     a, n = __generate_candidate_discrete_matrix(num_cols, num_samples, sample_tree, bits, usable_cols)
+
+    if a == None:
+        log("discrete matrix is none, tryin again", log_file)
+        #probably because rpy2 flooded the R pointer stack b/c R sucks.
+        return create_discrete_matrix(num_cols, num_samples, sample_tree, bits)
+
     assert isinstance(a, robjects.Matrix)
     assert a.ncol == usable_cols
 

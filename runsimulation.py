@@ -8,17 +8,17 @@ import stopwatch
 import sys
 import traceback
 
-sys.setrecursionlimit(100000)
+sys.setrecursionlimit(1000000)
 timer = stopwatch.Timer()
 
 hostname = os.uname()[1]
 
-num_runs = 10
+num_runs = 1
 
 bits = 3
 
-col_start = 50
-col_end = 51
+col_start = 100
+col_end = 101
 col_inc = 1
 col_range = range(col_start, col_end, col_inc)
 
