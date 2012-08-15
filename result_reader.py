@@ -3,7 +3,8 @@ __author__ = 'chris'
 import os
 
 def main():
-    read_results("/Users/chris/PycharmProjects/BayesianSimulation/bayesiansimulation/072412_130800/out/out.txt")
+    #   read_results("/Users/chris/PycharmProjects/BayesianSimulation/bayesiansimulation/072412_130800/out/out.txt")
+    read_results("/Users/chris/Desktop/out.txt")
 
 def read_results(file_name):
     file = os.path.abspath(file_name)

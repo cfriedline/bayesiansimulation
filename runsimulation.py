@@ -13,7 +13,7 @@ timer = stopwatch.Timer()
 
 hostname = os.uname()[1]
 
-num_runs = 1
+num_runs = 10
 
 bits = 3
 
@@ -70,12 +70,16 @@ out_file = open(os.path.join(out_dir, "out.txt"), "w")
 out_file.write("num_samples,num_cols,dist,"
                "mb_orig_topo,mb_orig_symm,mb_orig_path,"
                "mb_recon_topo,mb_recon_symm,mb_recon_path,"
-               "u_uni_topo,u_uni_symm,u_uni_path,"
-               "w_uni_topo,w_uni_symm,w_uni_path,"
+               "u_uni_cluster_topo,u_uni_cluster_symm,u_uni_cluster_path,"
+               "w_uni_cluster_topo,w_uni_cluster_symm,w_uni_cluster_path,"
                "paralin_cluster_topo,paralin_cluster_symm,paralin_cluster_path,"
                "bc_cluster_topo,bc_cluster_symm,bc_cluster_path,"
+               "u_uni_nj_topo,u_uni_nj_symm,u_uni_nj_path,"
+               "w_uni_nj_topo,w_uni_nj_symm,w_uni_nj_path,"
                "paralin_nj_topo,paralin_nj_symm,paralin_nj_path,"
                "bc_nj_topo,bc_nj_symm,bc_nj_path,"
+               "u_uni_pcoa_topo,u_uni_pcoa_symm,u_uni_pcoa_path,"
+               "w_uni_pcoa_topo,w_uni_pcoa_symm,w_uni_pcoa_path,"
                "bc_pcoa_topo,bc_pcoa_symm,bc_pcoa_path,"
                "paralin_pcoa_topo,paralin_pcoa_symm,paralin_pcoa_path"
                "\n")
@@ -141,19 +145,8 @@ for i in range(len(col_range)):
 
 
                 #do unifrac in python (PyCogent)
-                (u_uni_matrix, u_uni_rownames), (w_uni_matix, w_uni_names) = app.calculate_unifrac(abund, sample_names,
+                (u_uni_matrix, u_uni_rownames), (w_uni_matrix, w_uni_rownames) = app.calculate_unifrac(abund, sample_names,
                                                                                                    taxa_tree)
-                #unweighted
-                u_unifrac_cluster_tree = app.get_py_unifrac_cluster(u_uni_matrix, u_uni_rownames)
-                assert app.is_binary_tree(u_unifrac_cluster_tree) == True
-                #weighted
-                w_unifrac_cluster_tree = app.get_py_unifrac_cluster(w_uni_matix, w_uni_names)
-                assert app.is_binary_tree(w_unifrac_cluster_tree) == True
-
-                # do unifrac in r
-                #app.store_unifrac_distance(abund, sample_names, taxa_tree)
-                #r_unifrac_cluster_tree = app.get_unifrac_cluster()
-                #assert app.is_binary_tree(r_unifrac_cluster_tree) == True
 
                 # do mrbayes
                 mb_tree = app.run_mrbayes(k, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, run_dir,
@@ -163,42 +156,61 @@ for i in range(len(col_range)):
                                            num_samples, "recon")
                 assert app.is_binary_tree(mb_tree2) == True
 
-                # do paralinear/average linkage
+                # do average linkage
                 paralin_cluster_tree = app.get_paralinear_cluster()
                 assert app.is_binary_tree(paralin_cluster_tree) == True
-
-                # do bray-curtis/average linkage clustering
                 bc_cluster_tree = app.get_bc_cluster(abund, sample_names)
                 assert app.is_binary_tree(bc_cluster_tree) == True
+                #unweighted
+                u_unifrac_cluster_tree = app.get_py_unifrac_cluster(u_uni_matrix, u_uni_rownames)
+                assert app.is_binary_tree(u_unifrac_cluster_tree) == True
+                #weighted
+                w_unifrac_cluster_tree = app.get_py_unifrac_cluster(w_uni_matrix, w_uni_rownames)
+                assert app.is_binary_tree(w_unifrac_cluster_tree) == True
 
-                # do paralinear/neighbor joining
-                paralin_nj_tree = app.get_paralinear_nj()
-                assert app.is_binary_tree(paralin_nj_tree) == True
-
-                # do bray_curtis/neighbor joining
+                # do neighbor joining
                 bc_nj_tree = app.get_bc_nj()
                 assert app.is_binary_tree(bc_nj_tree) == True
+                paralin_nj_tree = app.get_paralinear_nj()
+                assert app.is_binary_tree(paralin_nj_tree) == True
+                u_unifrac_nj_tree = app.get_unifrac_nj(u_uni_matrix, u_uni_rownames)
+                assert app.is_binary_tree(u_unifrac_nj_tree) == True
+                w_unifrac_nj_tree = app.get_unifrac_nj(w_uni_matrix, w_uni_rownames)
+                assert app.is_binary_tree(w_unifrac_nj_tree) == True
 
-                # do bray_curtis/pcoa
+                # do pcoa
                 bc_pcoa_tree = app.get_bc_pcoa_tree()
                 assert app.is_binary_tree(bc_pcoa_tree) == True
-
-                # do paralinear/pcoa
                 paralin_pcoa_tree = app.get_paralin_pcoa_tree()
                 assert app.is_binary_tree(paralin_pcoa_tree) == True
+                u_unifrac_pcoa_tree = app.get_unifrac_pcoa_tree(u_uni_matrix, u_uni_rownames)
+                if u_unifrac_pcoa_tree is not None:
+                    assert app.is_binary_tree(u_unifrac_pcoa_tree)
+
+                w_unifrac_pcoa_tree = app.get_unifrac_pcoa_tree(w_uni_matrix, w_uni_rownames)
+                if w_unifrac_pcoa_tree is not None:
+                    assert app.is_binary_tree(w_unifrac_pcoa_tree)
 
                 # calc differences
                 results.mb_orig_diff = app.calculate_differences_r(sample_tree, mb_tree)
                 results.mb_recon_diff = app.calculate_differences_r(sample_tree, mb_tree2)
-                #results.r_uni_cluster_diff = app.calculate_differences_r(sample_tree, r_unifrac_cluster_tree)
+
                 results.u_uni_cluster_diff = app.calculate_differences_r(sample_tree, u_unifrac_cluster_tree)
+                results.u_uni_pcoa_diff = app.calculate_differences_r(sample_tree, u_unifrac_pcoa_tree)
+                results.u_uni_nj_diff = app.calculate_differences_r(sample_tree, u_unifrac_nj_tree)
+
                 results.w_uni_cluster_diff = app.calculate_differences_r(sample_tree, w_unifrac_cluster_tree)
-                results.paralin_cluster_diff = app.calculate_differences_r(sample_tree, paralin_cluster_tree)
-                results.bc_cluster_diff = app.calculate_differences_r(sample_tree, bc_cluster_tree)
+                results.w_uni_pcoa_diff = app.calculate_differences_r(sample_tree, w_unifrac_pcoa_tree)
+                results.w_uni_nj_diff = app.calculate_differences_r(sample_tree, w_unifrac_nj_tree)
+
                 results.paralin_nj_diff = app.calculate_differences_r(sample_tree, paralin_nj_tree)
+                results.paralin_cluster_diff = app.calculate_differences_r(sample_tree, paralin_cluster_tree)
+                results.paralin_pcoa_diff = app.calculate_differences_r(sample_tree, paralin_pcoa_tree)
+
+                results.bc_cluster_diff = app.calculate_differences_r(sample_tree, bc_cluster_tree)
                 results.bc_nj_diff = app.calculate_differences_r(sample_tree, bc_nj_tree)
                 results.bc_pcoa_diff = app.calculate_differences_r(sample_tree, bc_pcoa_tree)
-                results.paralin_pcoa_diff = app.calculate_differences_r(sample_tree, paralin_pcoa_tree)
+
                 #                results.paralin_cluster_diff = (0, 0, 0)
                 #                results.paralin_nj_diff = (0, 0, 0)
                 #                results.paralin_pcoa_diff = (0, 0, 0)

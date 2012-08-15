@@ -3,7 +3,7 @@ import random
 import string
 import traceback
 import rpy2.rinterface as rinterface
-rinterface.set_initoptions(('rpy2', '--vanilla', '--max-ppsize=500000'))
+rinterface.set_initoptions(('rpy2', '--vanilla', '--max-ppsize=500000', '--quiet'))
 
 import numpy
 from subprocess import  Popen, PIPE, STDOUT
@@ -664,31 +664,40 @@ def __get_range_for_column(matrix, col):
     return [row[col] for row in matrix]
 
 
-@clockit
-def store_unifrac_distance(abund, sample_names, taxa_tree):
-    assert isinstance(taxa_tree, dendropy.Tree)
+def get_unifrac_cluster(matrix, rownames):
+    name = __get_random_string(20)
+    rows = name + "rownames"
+    clust = name + "clust"
+    phylo = name + "phylo"
+    print name, rows, clust, phylo
     r = robjects.r
-    robjects.globalenv['taxatreestring'] = taxa_tree.as_newick_string() + ";"
-    r('taxatree=read.tree(text=taxatreestring)')
-    robjects.globalenv['abund'] = robjects.conversion.py2ri(numpy.asarray(abund))
-    robjects.globalenv['sample_names'] = sample_names
-    robjects.globalenv['taxa_names'] = sorted(taxa_tree.taxon_set.labels())
-    r('rownames(abund) = sample_names')
-    r('colnames(abund) = taxa_names')
-    r('unidist = unifrac(abund, taxatree)')
-
-
-def get_unifrac_cluster():
-    """
-    Gets unifrac cluster from the r environment
-    @return: unifrac cluster
-    @rtype: dendropy.Tree
-    """
-    r = robjects.r
-    r("uniclust = hclust(unidist, method='average')")
-    r("uniphylo = as.phylo(uniclust)")
-    tree = r('multi2di(uniphylo)')
+    assert isinstance(matrix, numpy.ndarray)
+    nr, nc = matrix.shape
+    matrix_vec = robjects.FloatVector(matrix.transpose().reshape(matrix.size))
+    matrix_r = r.matrix(matrix_vec, nrow=nr, ncol=nc)
+    robjects.globalenv[name] = matrix_r
+    robjects.globalenv[rows] = rownames
+    print r[name]
+    r("rownames(%s) = %s" % (name, rows))
+    print matrix
+    print r[name]
+    r("%s = hclust(%s, method='average')" % (clust, name))
+    r("%s = as.phylo(%s)" % (phylo, clust))
+    tree = r('multi2di(%s)' % phylo)
     return ape_to_dendropy(tree)
+
+
+#def get_unifrac_cluster():
+#    """
+#    Gets unifrac cluster from the r environment
+#    @return: unifrac cluster
+#    @rtype: dendropy.Tree
+#    """
+#    r = robjects.r
+#    r("uniclust = hclust(unidist, method='average')")
+#    r("uniphylo = as.phylo(uniclust)")
+#    tree = r('multi2di(uniphylo)')
+#    return ape_to_dendropy(tree)
 
 
 def print_matrices(abund, ranges, gap, gap2, matrix, matrix2, log_dir, i, dist, num_samples, num_cols):
@@ -805,6 +814,13 @@ def calculate_differences_r(orig_tree, test_tree):
     @return: a tuple of distances
     @rtype: tuple
     """
+
+    # makes sure that test_tree actually exists, as can happen
+    # when unifrac dist mats cannot do pcoa b/c of all 0
+    # eigenvalues
+    if test_tree is None:
+        return -1, -1, -1
+
     assert isinstance(orig_tree, dendropy.Tree)
     assert isinstance(test_tree, dendropy.Tree)
     if orig_tree.is_rooted is True:
@@ -915,6 +931,7 @@ def get_bc_cluster(abund, sample_names):
     return ape_to_dendropy(tree)
 
 
+
 def get_paralinear_nj():
     """
     Gets an nj tree from paralinear distance matrix
@@ -926,6 +943,25 @@ def get_paralinear_nj():
     tree = r('multi2di(paralin_nj)')
     return ape_to_dendropy(tree)
 
+@clockit
+def get_unifrac_nj(matrix, rownames):
+    """
+    returns a neighbor joining tree from a unifrac distance matrix
+    @param matrix:
+    @param rownames:
+    @return:
+    """
+    assert isinstance(matrix, numpy.ndarray)
+    r = robjects.r
+    name = __get_random_string(20)
+    rows = name + "_rows"
+    nj = name + "_nj"
+    robjects.globalenv[name] = robjects.conversion.py2ri(matrix)
+    robjects.globalenv[rows] = robjects.conversion.py2ri(rownames)
+    r('rownames(%s) = %s' % (name, rows))
+    r('%s = nj(as.dist(%s))' % (nj, name))
+    tree = r('multi2di(%s)' % nj)
+    return ape_to_dendropy(tree)
 
 def get_bc_nj():
     """
@@ -953,6 +989,28 @@ def get_bc_pcoa_tree():
     r("bc_pcoa_clust = hclust(bc_pcoa_euclid, 'ave')")
     tree = r('as.phylo(bc_pcoa_clust)')
     return ape_to_dendropy(tree)
+
+def get_unifrac_pcoa_tree(matrix, rownames):
+    r = robjects.r
+    assert isinstance(matrix, numpy.ndarray)
+    name = __get_random_string(10)
+    pcoa = name + "_pcoa"
+    euclid = name + "_euclid"
+    clust = name + "_clust"
+    rows = name + "_rownames"
+    robjects.globalenv[name] = robjects.conversion.py2ri(matrix)
+    robjects.globalenv[rows] = robjects.conversion.py2ri(rownames)
+    r('rownames(%s) = %s' % (name, rows))
+    r('%s = as.dist(%s, diag=T, upper=T)' % (name, name))
+    try:
+        r('%s = pcoa(%s)' % (pcoa, name))
+        r("%s = vegdist(%s$vectors[,1:2], 'euc')" % (euclid, pcoa))
+        r("%s = hclust(%s, 'ave')" % (clust, euclid))
+        tree = r('as.phylo(%s)' % clust)
+        return ape_to_dendropy(tree)
+    except:
+        return None
+
 
 
 def get_paralin_pcoa_tree():
@@ -1070,3 +1128,5 @@ def correlate_matrices(matrix1, matrix2):
         [m1.append(elem) for elem in matrix1.rx(i + 1, True)]
         [m2.append(elem) for elem in matrix2.rx(i + 1, True)]
     return stats.pearsonr(numpy.asarray(m1), numpy.asarray(m2))
+
+
