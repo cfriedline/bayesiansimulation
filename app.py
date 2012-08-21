@@ -27,7 +27,7 @@ from cogent import LoadTree
 from cogent.maths.unifrac.fast_unifrac import fast_unifrac, UNIFRAC_DIST_MATRIX
 from scipy import stats
 
-__author__ = 'chris'
+_author_ = 'chris'
 log_file = None
 
 
@@ -87,7 +87,7 @@ def calculate_unifrac(abund, sample_names, taxa_tree):
     @return: (unweighted matrix, row names), (weighted matrix, row names)
     @rtype: tuple
     """
-    unifrac_dict = __create_unifrac_dict(abund, sample_names, taxa_tree)
+    unifrac_dict = _create_unifrac_dict(abund, sample_names, taxa_tree)
     tree = dendropy_to_cogent(taxa_tree)
     unweighted = fast_unifrac(tree, unifrac_dict, modes = {UNIFRAC_DIST_MATRIX}, is_symmetric = True, weighted = False)
     un_matrix = unweighted[UNIFRAC_DIST_MATRIX][0]
@@ -99,7 +99,7 @@ def calculate_unifrac(abund, sample_names, taxa_tree):
     return (un_matrix, un_rows), (w_matrix, w_rows)
 
 
-def __create_unifrac_dict(abund, sample_names, taxa_tree):
+def _create_unifrac_dict(abund, sample_names, taxa_tree):
     """
     creates a unifrac dictionary
     @param abund:
@@ -179,6 +179,14 @@ def create_R(dir):
     robjects.globalenv['outfile'] = os.path.abspath(os.path.join(dir, "trees.pdf"))
     r('pdf(file=outfile, onefile=T)')
     r("par(mfrow=c(2,3))")
+    
+    r("""
+        get_discrete_matrix = function(tree, needed) {
+            matrix = replicate(needed, rTraitDisc(tree, model="ER", k=2,states=0:1))
+            matrix = t(apply(matrix, 1, as.numeric))
+            return(matrix)                    
+        }
+    """)
 
     r("""
         get_valid_triplets = function(numsamples, needed, bits) {
@@ -217,7 +225,7 @@ def is_binary_tree(tree):
 
 
 @clockit
-def __create_paralin_matrix(a):
+def _create_paralin_matrix(a):
     """
     creates a paralinear distance matrix
     @param a: a rojbects.Matrix object of the discrete character matrix
@@ -266,11 +274,11 @@ def get_paralin_distance(seq1, seq2):
     return d
 
 
-def __ret_valid_triplets(results):
+def _ret_valid_triplets(results):
     return results
 
 
-def __get_valid_triplets(num_samples, num_triplets, bits, q):
+def _get_valid_triplets(num_samples, num_triplets, bits, q):
     try:
         r = robjects.r
         name = current_process().name.replace("-", "_")
@@ -285,9 +293,25 @@ def __get_valid_triplets(num_samples, num_triplets, bits, q):
         q.put("DEATH")
         traceback.print_exc()
 
-def __generate_candidate_discrete_matrix(num_cols, num_samples, sample_tree, bits, usable_cols):
+def _generate_candiate_free_discrete_matrix(sample_tree, usable_cols):
     assert isinstance(sample_tree, dendropy.Tree)
-    print "Creating discrete character matrix"
+    print "Creating discrete triplet character matrix"
+    r = robjects.r
+    treename = _get_random_string(10)
+    matrixname = _get_random_string(10)
+    newick = sample_tree.as_newick_string()
+    num_samples = len(sample_tree.leaf_nodes())
+    robjects.globalenv[treename] = newick + ";"
+    r("%s = read.tree(text=%s)" % (treename, treename))
+    r("%s = get_discrete_matrix(%s, %d)" % (matrixname, treename, usable_cols))
+    a = r[matrixname]
+    n = r('rownames(%s)' % matrixname)
+    return a, n
+
+
+def _generate_candidate_triplet_discrete_matrix(num_cols, num_samples, sample_tree, bits, usable_cols):
+    assert isinstance(sample_tree, dendropy.Tree)
+    print "Creating discrete triplet character matrix"
     r = robjects.r
     newick = sample_tree.as_newick_string()
     num_samples = len(sample_tree.leaf_nodes())
@@ -309,7 +333,7 @@ def __generate_candidate_discrete_matrix(num_cols, num_samples, sample_tree, bit
     pool = Pool(processes=num_procs, maxtasksperchild=1)
     q = manager.Queue(maxsize=num_procs)
     for arg in args:
-        pool.apply_async(__get_valid_triplets, (num_samples, arg, bits, q))
+        pool.apply_async(_get_valid_triplets, (num_samples, arg, bits, q))
     pool.close()
     pool.join()
 
@@ -342,26 +366,38 @@ def create_discrete_matrix(num_cols, num_samples, sample_tree, bits):
     """
     r = robjects.r
     usable_cols = find_usable_length(num_cols, bits)
-    a, n = __generate_candidate_discrete_matrix(num_cols, num_samples, sample_tree, bits, usable_cols)
+    a, n = _generate_candidate_triplet_discrete_matrix(num_cols, num_samples, sample_tree, bits, usable_cols)
+    b, m = _generate_candiate_free_discrete_matrix(sample_tree, usable_cols)
 
-    if a == None:
-        log("discrete matrix is none, tryin again", log_file)
+    if a is None:
+        log("triplet discrete matrix is none, tryin again", log_file)
         #probably because rpy2 flooded the R pointer stack b/c R sucks.
         return create_discrete_matrix(num_cols, num_samples, sample_tree, bits)
+
+    if b is None:
+        log("free discrete matrix is none, tryin again", log_file)
+        #probably because rpy2 flooded the R pointer stack b/c R sucks.
+        return create_discrete_matrix(num_cols, num_samples, sample_tree, bits)
+
 
     assert isinstance(a, robjects.Matrix)
     assert a.ncol == usable_cols
 
-    paralin_matrix, valid = __create_paralin_matrix(a)
-    if valid is False:
+    assert isinstance(b, robjects.Matrix)
+    assert b.ncol == usable_cols
+
+    triplet_paralin_matrix, triplet_valid = _create_paralin_matrix(a)
+    free_paralin_matrix, free_valid = _create_paralin_matrix(b)
+
+    if triplet_valid is False or free_valid is False:
         sample_tree = create_tree(num_samples, type = "S")
         return create_discrete_matrix(num_cols, num_samples, sample_tree, bits)
     else:
-        robjects.globalenv['paralin_matrix'] = paralin_matrix
+        robjects.globalenv['paralin_matrix'] = triplet_paralin_matrix
         r('rownames(paralin_matrix) = rownames(m)')
         r('paralin_dist = as.dist(paralin_matrix, diag=T, upper=T)')
         r("paralinear_cluster = hclust(paralin_dist, method='average')")
-    return sample_tree, a, n
+    return sample_tree, a, n, b, m
 
 
 @clockit
@@ -651,7 +687,7 @@ def restandardize_matrix(abund, ranges):
     return data
 
 
-def __get_range_for_columns(matrix):
+def _get_range_for_columns(matrix):
     cols = len(matrix[0])
     data = []
     for col in range(cols):
@@ -660,12 +696,12 @@ def __get_range_for_columns(matrix):
     return data
 
 
-def __get_range_for_column(matrix, col):
+def _get_range_for_column(matrix, col):
     return [row[col] for row in matrix]
 
 
 def get_unifrac_cluster(matrix, rownames):
-    name = __get_random_string(20)
+    name = _get_random_string(20)
     rows = name + "rownames"
     clust = name + "clust"
     phylo = name + "phylo"
@@ -841,32 +877,32 @@ def calculate_differences_r(orig_tree, test_tree):
 
 
 def print_trees_to_pdf(taxa_tree, sample_tree,
-                       mb_tree, mb_tree2,
+                       free_mb_tree, mb_tree, mb_tree2,
                        u_unifrac_tree, w_unifrac_tree,
-                       mb_diff, mb_diff2,
+                       free_mb_diff, mb_diff, mb_diff2,
                        u_uni_diff, w_uni_diff,
                        dist, iter):
     assert isinstance(taxa_tree, dendropy.Tree)
     assert isinstance(sample_tree, dendropy.Tree)
-    #assert isinstance(r_unifrac_tree, dendropy.Tree)
     assert isinstance(mb_tree, dendropy.Tree)
+    assert isinstance(mb_tree2, dendropy.Tree)
+    assert isinstance(free_mb_tree, dendropy.Tree)
     assert isinstance(u_unifrac_tree, dendropy.Tree)
     assert isinstance(w_unifrac_tree, dendropy.Tree)
     r = robjects.r
 
+    robjects.globalenv['free_mb_diff'] = list(free_mb_diff)
     robjects.globalenv['mb_diff'] = list(mb_diff)
     robjects.globalenv['mb_diff2'] = list(mb_diff2)
 
-    #robjects.globalenv['r_uni_diff'] = list(r_uni_diff)
     robjects.globalenv['u_uni_diff'] = list(u_uni_diff)
     robjects.globalenv['w_uni_diff'] = list(w_uni_diff)
 
     robjects.globalenv['taxatree'] = taxa_tree.as_newick_string() + ";"
     robjects.globalenv['sampletree'] = sample_tree.as_newick_string() + ";"
+    robjects.globalenv['freeMbResult'] = free_mb_tree.as_newick_string() + ";"
     robjects.globalenv['mbResult'] = mb_tree.as_newick_string() + ";"
     robjects.globalenv['mbResult2'] = mb_tree2.as_newick_string() + ";"
-
-    #robjects.globalenv['r_uniclust'] = r_unifrac_tree.as_newick_string() + ";"
 
     robjects.globalenv['u_uniclust'] = u_unifrac_tree.as_newick_string() + ";"
     robjects.globalenv['w_uniclust'] = w_unifrac_tree.as_newick_string() + ";"
@@ -876,18 +912,20 @@ def print_trees_to_pdf(taxa_tree, sample_tree,
 
     r('taxatree = read.tree(text=taxatree)')
     r('sampletree = read.tree(text=sampletree)')
+    r('freeMbResult = read.tree(text=freeMbResult)')
     r('mbResult = read.tree(text=mbResult)')
     r('mbResult2 = read.tree(text=mbResult2)')
-    #r('r_uniclust = read.tree(text=r_uniclust)')
     r('u_uniclust = read.tree(text=u_uniclust)')
     r('w_uniclust = read.tree(text=w_uniclust)')
 
 
-    #r('plot(taxatree)')
-    #r("title(main=paste('taxa tree (', length(taxatree$tip.label), ')', sep=''))")
     r('plot(sampletree)')
     r("title(main=paste(iter, ': sample tree (', length(sampletree$tip.label), ')', sep=''), "
       "sub=paste(length(taxatree$tip.label), ' taxa', sep=''))")
+
+    r('plot(freeMbResult)')
+    r("title(main=paste(distname, ' free mrbayes', sep=''), "
+      "sub=paste('diffs=', free_mb_diff[1], '/', free_mb_diff[2], '/', free_mb_diff[3], sep=''))")
 
     r('plot(mbResult)')
     r("title(main=paste(distname, ' orig mrbayes', sep=''), "
@@ -896,9 +934,6 @@ def print_trees_to_pdf(taxa_tree, sample_tree,
     r('plot(mbResult2)')
     r("title(main=paste(distname, ' recon mrbayes', sep=''), "
       "sub=paste('diffs=', mb_diff2[1], '/', mb_diff2[2], '/', mb_diff2[3], sep=''))")
-
-    #r("plot(r_uniclust)")
-    #r("title(main=paste(distname, ' r unifrac', sep=''), sub=paste('diffs=', r_uni_diff[1], '/', r_uni_diff[2], '/', r_uni_diff[3], sep=''))")
 
     r("plot(u_uniclust)")
     r("title(main=paste(distname, ' u unifrac', sep=''), "
@@ -909,7 +944,6 @@ def print_trees_to_pdf(taxa_tree, sample_tree,
       "sub=paste('diffs=', w_uni_diff[1], '/', w_uni_diff[2], '/', w_uni_diff[3], sep=''))")
 
     r('plot.new()')
-    #r('plot.new()')
 
 
 def get_bc_cluster(abund, sample_names):
@@ -953,7 +987,7 @@ def get_unifrac_nj(matrix, rownames):
     """
     assert isinstance(matrix, numpy.ndarray)
     r = robjects.r
-    name = __get_random_string(20)
+    name = _get_random_string(20)
     rows = name + "_rows"
     nj = name + "_nj"
     robjects.globalenv[name] = robjects.conversion.py2ri(matrix)
@@ -993,7 +1027,7 @@ def get_bc_pcoa_tree():
 def get_unifrac_pcoa_tree(matrix, rownames):
     r = robjects.r
     assert isinstance(matrix, numpy.ndarray)
-    name = __get_random_string(10)
+    name = _get_random_string(10)
     pcoa = name + "_pcoa"
     euclid = name + "_euclid"
     clust = name + "_clust"
@@ -1091,14 +1125,14 @@ def get_discrete_matrix_from_standardized(gap, bits, sample_names):
         row_string = ''.join([bin(int(elem)).replace("0b", "").rjust(bits, "0") for elem in row])
         disc.append([int(elem) for elem in row_string])
     disc = numpy.array(disc)
-    r_name = __get_random_string(20)
+    r_name = _get_random_string(20)
     robjects.globalenv[r_name] = disc
     robjects.globalenv[r_name + "_rownames"] = sample_names
     r('rownames(%s) = %s' % (r_name, r_name + "_rownames"))
     return r[r_name]
 
 
-def __get_random_string(length):
+def _get_random_string(length):
     """
     gets a random string of letters/numbers, ensuring that it does not start with a
     number
@@ -1108,7 +1142,7 @@ def __get_random_string(length):
     """
     s = ''.join(random.choice(string.letters + string.digits) for i in xrange(length))
     if not s[0] in string.letters:
-        return __get_random_string(length)
+        return _get_random_string(length)
     return s
 
 

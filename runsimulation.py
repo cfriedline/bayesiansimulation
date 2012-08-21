@@ -43,7 +43,7 @@ if 'godel' in hostname:
     mpi = '/test/riveralab/cfriedline/bin/mpirun'
     mb = '/test/riveralab/cfriedline/src/mrbayes_3.2.1/src/mb'
     procs = 8
-    project_dir = '/test/riveralab/cfriedline/projects/bsim2'
+    project_dir = '/home/cfriedline/projects/bsim'
 elif 'phylogeny' in hostname:
     mpi = '/usr/local/bin/mpirun'
     mb = '/home/cfriedline/src/mrbayes_3.2.1/src/mb'
@@ -68,6 +68,7 @@ app.log_file = log_file
 
 out_file = open(os.path.join(out_dir, "out.txt"), "w")
 out_file.write("num_samples,num_cols,dist,"
+               "free_mb_orig_topo,free_mb_orig_symm,free_mb_orig_path,"
                "mb_orig_topo,mb_orig_symm,mb_orig_path,"
                "mb_recon_topo,mb_recon_symm,mb_recon_path,"
                "u_uni_cluster_topo,u_uni_cluster_symm,u_uni_cluster_path,"
@@ -124,9 +125,9 @@ for i in range(len(col_range)):
                     sample_tree = sample_trees[k]
 
                 #setup all the matrices
-                matrix = sample_names = None
+                matrix = sample_names = free_matrix = free_names = None
                 try:
-                    sample_tree2, matrix, sample_names = app.create_discrete_matrix(num_cols,
+                    sample_tree2, matrix, sample_names, free_matrix, free_names = app.create_discrete_matrix(num_cols,
                                                                                     num_samples, sample_tree, bits)
                     if sample_tree2 != sample_tree:
                         assert app.is_binary_tree(sample_tree2) == True
@@ -151,6 +152,10 @@ for i in range(len(col_range)):
                 # do mrbayes
                 mb_tree = app.run_mrbayes(k, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, run_dir,
                                           num_samples, "orig")
+
+                free_mb_tree = app.run_mrbayes(k, free_matrix, free_names, num_cols, n_gen, mpi, mb, procs, dist, run_dir,
+                                          num_samples, "free")
+
                 assert app.is_binary_tree(mb_tree) == True
                 mb_tree2 = app.run_mrbayes(k, matrix2, sample_names, num_cols, n_gen, mpi, mb, procs, dist, run_dir,
                                            num_samples, "recon")
@@ -194,6 +199,7 @@ for i in range(len(col_range)):
                 # calc differences
                 results.mb_orig_diff = app.calculate_differences_r(sample_tree, mb_tree)
                 results.mb_recon_diff = app.calculate_differences_r(sample_tree, mb_tree2)
+                results.mb_free_diff = app.calculate_differences_r(sample_tree, free_mb_tree)
 
                 results.u_uni_cluster_diff = app.calculate_differences_r(sample_tree, u_unifrac_cluster_tree)
                 results.u_uni_pcoa_diff = app.calculate_differences_r(sample_tree, u_unifrac_pcoa_tree)
@@ -223,17 +229,18 @@ for i in range(len(col_range)):
                             "w")
                 out3 = open(os.path.join(log_dir, "mbtree_recon_%d_%d_%s_%d.tre" % (num_samples, num_cols, dist, k)),
                             "w")
+                out4 = open(os.path.join(log_dir, "mbtree_free_%d_%d_%s_%d.tre" % (num_samples, num_cols, dist, k)),
+                            "w")
 
-                #out3 = open(os.path.join(log_dir, "unitree_%d_%d_%s_%d.tre" % (num_samples, num_cols, dist, k)), "w")
-                writers = [out1, out2, out3]
+                writers = [out1, out2, out3, out4]
                 out1.write(sample_tree.as_newick_string() + ";\n")
                 out2.write(mb_tree.as_newick_string() + ";\n")
                 out3.write(mb_tree2.as_newick_string() + ";\n")
+                out4.write(free_mb_tree.as_newick_string() + ";\n")
 
-                #out3.write(r_unifrac_cluster_tree.as_newick_string() + ";\n")
-                app.print_trees_to_pdf(taxa_tree, sample_tree, mb_tree, mb_tree2,
+                app.print_trees_to_pdf(taxa_tree, sample_tree, free_mb_tree, mb_tree, mb_tree2,
                                        u_unifrac_cluster_tree, w_unifrac_cluster_tree,
-                                       results.mb_orig_diff, results.mb_recon_diff, results.u_uni_cluster_diff,
+                                       results.mb_free_diff, results.mb_orig_diff, results.mb_recon_diff, results.u_uni_cluster_diff,
                                        results.w_uni_cluster_diff,
                                        dist, k)
                 [i.close() for i in writers]

@@ -4,6 +4,7 @@ class Results:
     def __init__(self, num_samples, num_cols, dist):
         self.mb_orig_diff = None
         self.mb_recon_diff = None
+        self.mb_free_diff = None
 
         self.paralin_cluster_diff = None
         self.paralin_nj_diff = None
@@ -40,10 +41,14 @@ class Results:
                        "%d,%d,%.2f,"
                        "%d,%d,%.2f,"
                        "%d,%d,%.2f,"
+                       "%d,%d,%.2f,"
                        "%d,%d,%.2f\n" %
                        (self.num_samples,
                         self.num_cols,
                         self.dist,
+                        self.mb_free_diff[0],
+                        self.mb_free_diff[1],
+                        self.mb_free_diff[2],
                         self.mb_orig_diff[0],
                         self.mb_orig_diff[1],
                         self.mb_orig_diff[2],
