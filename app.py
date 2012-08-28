@@ -3,6 +3,7 @@ import random
 import string
 import traceback
 import rpy2.rinterface as rinterface
+
 rinterface.set_initoptions(('rpy2', '--vanilla', '--max-ppsize=500000', '--quiet'))
 
 import numpy
@@ -43,8 +44,9 @@ def clockit(func):
         t.stop()
         output = '\t%s in %s' % (func.__name__, t)
         print output
-        log_file.write("%s\n" % output)
-        log_file.flush()
+        if log_file is not None:
+            log_file.write("%s\n" % output)
+            log_file.flush()
         del t
         return retval
 
@@ -179,7 +181,7 @@ def create_R(dir):
     robjects.globalenv['outfile'] = os.path.abspath(os.path.join(dir, "trees.pdf"))
     r('pdf(file=outfile, onefile=T)')
     r("par(mfrow=c(2,3))")
-    
+
     r("""
         get_discrete_matrix = function(tree, needed) {
             matrix = replicate(needed, rTraitDisc(tree, model="ER", k=2,states=0:1))
@@ -197,7 +199,7 @@ def create_R(dir):
                     triplet = replicate(bits, rTraitDisc(tree, model="ER", k=2,states=0:1))
                     triplet = t(apply(triplet, 1, as.numeric))
                     sums = rowSums(triplet)
-                    if (length(which(sums==0)) > 0 && length(which(sums==3)) == 1) {
+                    if (length(which(sums==0)) > 0 && length(which(sums==3)) > 0) {
                         if (found == 0) {
                             m = triplet
                         } else {
@@ -283,7 +285,8 @@ def _get_valid_triplets(num_samples, num_triplets, bits, q):
         r = robjects.r
         name = current_process().name.replace("-", "_")
         timer = stopwatch.Timer()
-        log("\trunning %s (%d cols/%d triplets), pid %d, ppid %d" % (name, num_triplets, num_triplets/bits, current_process().pid, os.getppid()),
+        log("\trunning %s (%d cols/%d triplets), pid %d, ppid %d" % (
+            name, num_triplets, num_triplets / bits, current_process().pid, os.getppid()),
             log_file)
         r('%s = get_valid_triplets(%d, %d, %d)' % (name, num_samples, num_triplets, bits))
         q.put((name, r[name]))
@@ -292,6 +295,7 @@ def _get_valid_triplets(num_samples, num_triplets, bits, q):
     except Exception, e:
         q.put("DEATH")
         traceback.print_exc()
+
 
 def _generate_candiate_free_discrete_matrix(sample_tree, usable_cols):
     assert isinstance(sample_tree, dendropy.Tree)
@@ -330,8 +334,8 @@ def _generate_candidate_triplet_discrete_matrix(num_cols, num_samples, sample_tr
         args[-1] += mod
         args[i] -= mod
     manager = Manager()
-    pool = Pool(processes=num_procs, maxtasksperchild=1)
-    q = manager.Queue(maxsize=num_procs)
+    pool = Pool(processes = num_procs, maxtasksperchild = 1)
+    q = manager.Queue(maxsize = num_procs)
     for arg in args:
         pool.apply_async(_get_valid_triplets, (num_samples, arg, bits, q))
     pool.close()
@@ -378,7 +382,6 @@ def create_discrete_matrix(num_cols, num_samples, sample_tree, bits):
         log("free discrete matrix is none, tryin again", log_file)
         #probably because rpy2 flooded the R pointer stack b/c R sucks.
         return create_discrete_matrix(num_cols, num_samples, sample_tree, bits)
-
 
     assert isinstance(a, robjects.Matrix)
     assert a.ncol == usable_cols
@@ -543,21 +546,23 @@ def get_range_standardized_matrix_from_discrete(matrix, bits, num_cols):
     return gap
 
 
-def compute_weight(max_char, abund, max, min):
+def compute_weight(num_states, abund, max, min):
     """
     Computes the gap weight
-    @param max_char: max char possible
+    @param num_states: max char possible
     @param abund: abundance to weight
     @param max: max in column
     @param min: min in column
     @return: the gap weight
     @rtype: int
     """
-    w = round((max_char * (abund - min)) / (max - min))
+    w = round((num_states * (abund - min)) / (max - min))
+    if w == num_states:
+        w = num_states - 1
     return w
 
 
-def find_range_limit(weight, abund, max, min, limit, max_char):
+def find_range_limit(weight, abund, max, min, limit, num_states):
     """
     finds the range limit of a gap weight given a starting abundance
     by interating high and low from the starting abundance and finding
@@ -567,7 +572,7 @@ def find_range_limit(weight, abund, max, min, limit, max_char):
     @param max: the max of the OTU across samples
     @param min: the min of the OTU across samples
     @param limit: whether we're looking at high or low case
-    @param max_char: max char used in gap formula (3 bits = 7)
+    @param num_states: max char used in gap formula (3 bits = 7)
     @return: the highest minimum abundance or lowest maximum abundance at a given weight
     @rtype: int
     """
@@ -583,31 +588,31 @@ def find_range_limit(weight, abund, max, min, limit, max_char):
     if test > max:
         return max
 
-    test_weight = compute_weight(max_char, test, max, min)
+    test_weight = compute_weight(num_states, test, max, min)
 
     if test_weight == weight:
-        return find_range_limit(weight, test, max, min, limit, max_char)
+        return find_range_limit(weight, test, max, min, limit, num_states)
     else:
         return abund
 
 
-def find_range(weight, abund, max, min, max_char):
+def find_range(weight, abund, max, min, num_states):
     """
     finds the upper and lower boundary of a weight given and abundance
     @param weight: the gap weight
     @param abund: the starting abundance
     @param max: the max value of an OTU
     @param min: the min value of an OTU
-    @param max_char: the max char in the formula (3 bits = 7)
+    @param num_states: the max char in the formula (3 bits = 7)
     @return: the upper and lower bound
     @rtype: tuple
     """
-    lower = find_range_limit(weight, abund, max, min, "low", max_char)
-    upper = find_range_limit(weight, abund, max, min, "high", max_char)
+    lower = find_range_limit(weight, abund, max, min, "low", num_states)
+    upper = find_range_limit(weight, abund, max, min, "high", num_states)
     return lower, upper
 
 
-def get_random_abundance(weight, abund, max, min, max_char):
+def get_random_abundance(weight, abund, max, min, num_states):
     """
     gets a random abundance given for an OTU by drawing from
     a uniform distribution on the range interval
@@ -615,16 +620,17 @@ def get_random_abundance(weight, abund, max, min, max_char):
     @param abund: the staring aboundance
     @param max: the max value of the OTU
     @param min: the min value of the OTU
-    @param max_char: the max char in the formula (3 bits = 7)
+    @param num_states: the max char in the formula (3 bits = 7)
     @return: the abundance
     @rypte: int
     """
-    r = find_range(weight, abund, max, min, max_char)
-    return round(numpy.random.uniform(low = r[0], high = r[1]))
+    r = find_range(weight, abund, max, min, num_states)
+    rand = numpy.random.uniform(low = r[0], high = r[1])
+    return round(rand)
 
 
 @clockit
-def get_abundance_matrix(gap, ranges, dist):
+def get_abundance_matrix(gap, ranges, dist, num_states):
     """
     computes and returns an abundance matrix given a set
     of column ranges, the type of distribution from which the ranges
@@ -636,33 +642,32 @@ def get_abundance_matrix(gap, ranges, dist):
     @rtype: list
     """
     print "Getting %s abundance matrix" % dist
-    max_char = 7 #weights range from 0-7
     data = []
     col_min = [False] * len(gap[0])
     col_max = [False] * len(gap[0])
     for i, row in enumerate(gap):
         data.append([None] * len(col_min))
         for j, weight in enumerate(row):
-            abund = round(((weight * (ranges[j][1] - ranges[j][0])) + (max_char * ranges[j][0])) / max_char)
+            abund = round(((weight*(ranges[j][1] - ranges[j][0]))/num_states) + ranges[j][0])
             if weight == 0.0:
                 if col_min[j] is False:
-                    data[i][j] = abund
+                    data[i][j] = ranges[j][0]
                     col_min[j] = True
                 else:
-                    data[i][j] = get_random_abundance(weight, abund, ranges[j][1], ranges[j][0], max_char)
-            elif weight == max_char:
+                    data[i][j] = get_random_abundance(weight, abund, ranges[j][1], ranges[j][0], num_states)
+            elif weight == (num_states - 1):
                 if col_max[j] is False:
-                    data[i][j] = abund
+                    data[i][j] = ranges[j][1]
                     col_max[j] = True
                 else:
-                    data[i][j] = get_random_abundance(weight, abund, ranges[j][1], ranges[j][0], max_char)
+                    data[i][j] = get_random_abundance(weight, abund, ranges[j][1], ranges[j][0], num_states)
             else:
-                data[i][j] = get_random_abundance(weight, abund, ranges[j][1], ranges[j][0], max_char)
+                data[i][j] = get_random_abundance(weight, abund, ranges[j][1], ranges[j][0], num_states)
     return data
 
 
 @clockit
-def restandardize_matrix(abund, ranges):
+def restandardize_matrix(abund, ranges, num_states):
     """
     computes a range-standardized matrix from the computed
     abunance matrix
@@ -681,7 +686,7 @@ def restandardize_matrix(abund, ranges):
             if range[0] == range[1]:
                 raise Exception("dupe range found at row %d %s" % (i, range), [row[j] for row in abund])
             if range[1] > 0:
-                data[i][j] = compute_weight(max_char = 7, abund = val, max = range[1], min = range[0])
+                data[i][j] = compute_weight(num_states, abund = val, max = range[1], min = range[0])
             else:
                 data[i][j] = 0
     return data
@@ -710,7 +715,7 @@ def get_unifrac_cluster(matrix, rownames):
     assert isinstance(matrix, numpy.ndarray)
     nr, nc = matrix.shape
     matrix_vec = robjects.FloatVector(matrix.transpose().reshape(matrix.size))
-    matrix_r = r.matrix(matrix_vec, nrow=nr, ncol=nc)
+    matrix_r = r.matrix(matrix_vec, nrow = nr, ncol = nc)
     robjects.globalenv[name] = matrix_r
     robjects.globalenv[rows] = rownames
     print r[name]
@@ -793,6 +798,7 @@ def create_mrbayes_file(file, matrix, sample_names, num_cols, n_gen):
     file.write("begin mrbayes;\n")
     file.write("set autoclose=yes nowarn=yes;\n")
     file.write("lset rates=equal coding=all;\n")
+    #file.write("mcmcp checkpoint=yes;\n")
     file.write("mcmc ngen=%d;\n" % n_gen)
     file.write("sump;\n")
     file.write("sumt;\n")
@@ -830,10 +836,14 @@ def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, 
     cmd_string = " ".join([str(elem) for elem in cmd])
     print cmd_string
     p = Popen(cmd_string, shell = True, stdin = PIPE, stdout = PIPE, stderr = STDOUT, close_fds = True)
-    p.communicate()
-    #    for line in iter(p.stdout.readline, ''):
-    #        print line.rstrip()
+    #    p.communicate()
+    for line in iter(p.stdout.readline, ''):
+        print line.rstrip()
     mbresult = os.path.abspath(mb_file) + ".con.tre"
+
+    if not os.path.exists(mbresult):
+        mbresult = os.path.abspath(mb_file) + ".con"
+
     tree = dendropy.Tree.get_from_path(mbresult, "nexus")
     assert isinstance(tree, dendropy.Tree)
     tree = make_tree_binary(tree.as_newick_string())
@@ -918,7 +928,6 @@ def print_trees_to_pdf(taxa_tree, sample_tree,
     r('u_uniclust = read.tree(text=u_uniclust)')
     r('w_uniclust = read.tree(text=w_uniclust)')
 
-
     r('plot(sampletree)')
     r("title(main=paste(iter, ': sample tree (', length(sampletree$tip.label), ')', sep=''), "
       "sub=paste(length(taxatree$tip.label), ' taxa', sep=''))")
@@ -965,7 +974,6 @@ def get_bc_cluster(abund, sample_names):
     return ape_to_dendropy(tree)
 
 
-
 def get_paralinear_nj():
     """
     Gets an nj tree from paralinear distance matrix
@@ -976,6 +984,7 @@ def get_paralinear_nj():
     r('paralin_nj = nj(paralin_dist)')
     tree = r('multi2di(paralin_nj)')
     return ape_to_dendropy(tree)
+
 
 @clockit
 def get_unifrac_nj(matrix, rownames):
@@ -996,6 +1005,7 @@ def get_unifrac_nj(matrix, rownames):
     r('%s = nj(as.dist(%s))' % (nj, name))
     tree = r('multi2di(%s)' % nj)
     return ape_to_dendropy(tree)
+
 
 def get_bc_nj():
     """
@@ -1024,6 +1034,7 @@ def get_bc_pcoa_tree():
     tree = r('as.phylo(bc_pcoa_clust)')
     return ape_to_dendropy(tree)
 
+
 def get_unifrac_pcoa_tree(matrix, rownames):
     r = robjects.r
     assert isinstance(matrix, numpy.ndarray)
@@ -1044,7 +1055,6 @@ def get_unifrac_pcoa_tree(matrix, rownames):
         return ape_to_dendropy(tree)
     except:
         return None
-
 
 
 def get_paralin_pcoa_tree():

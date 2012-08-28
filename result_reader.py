@@ -6,7 +6,8 @@ def main():
     #   read_results("/Users/chris/PycharmProjects/BayesianSimulation/bayesiansimulation/072412_130800/out/out.txt")
 #    read_results("/Users/chris/Desktop/out.txt")
 
-    read_results("/Users/chris/projects/081512_105614/out/out.txt")
+#    read_results("/Users/chris/projects/081512_105614/out/out.txt")
+    read_results("/Users/chris/projects/bayessim/results/082212_104332/out/out.txt")
 def read_results(file_name):
     file = os.path.abspath(file_name)
     fh = open(file)

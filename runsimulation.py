@@ -13,12 +13,12 @@ timer = stopwatch.Timer()
 
 hostname = os.uname()[1]
 
-num_runs = 10
+num_runs = 5
 
 bits = 3
 
-col_start = 100
-col_end = 101
+col_start = 600
+col_end = 601
 col_inc = 1
 col_range = range(col_start, col_end, col_inc)
 
@@ -140,7 +140,7 @@ for i in range(len(col_range)):
 
                 gap = app.get_range_standardized_matrix_from_discrete(matrix, bits, num_cols)
                 abund = app.get_abundance_matrix(gap, ranges, dist)
-                gap2 = app.restandardize_matrix(abund, ranges)
+                gap2 = app.restandardize_matrix(abund, ranges, num_states=8)
                 matrix2 = app.get_discrete_matrix_from_standardized(gap2, bits, sample_names)
                 matrix_cor = app.correlate_matrices(matrix, matrix2)
 

@@ -1,3 +1,5 @@
+import math
+
 __author__ = 'chris'
 
 import unittest
@@ -13,13 +15,27 @@ class Tester(unittest.TestCase):
         assert round(app.get_paralin_distance(self.t1, self.t2), 4) == 1.0617
 
     def test_weight(self):
-        max_char = 7
-        max = 10000
+        num_states = 8.0
+        max = 10900
         min = 0
-        assert app.compute_weight(max_char, max, max, min) == 7
-        assert app.compute_weight(max_char, min, max, min) == 0
-        assert app.compute_weight(max_char, max - 1, max, min) == 6
-        assert app.compute_weight(max_char, min + 1, max, min) == 0
+#        assert self._compute_weight(num_states, max, max, min) == 7
+#        assert self._compute_weight(num_states, min, max, min) == 0
+        d = {}
+        for i in xrange(max + 1):
+            weight = self._compute_weight(num_states, i, max, min)
+            if weight == num_states:
+#                weight = num_states - 1
+                pass
+            if weight in d:
+                d[weight] += 1
+            else:
+                d[weight] = 1
+        print d
 
+    def _compute_weight(self, num_states, abund, max, min):
+        w = (num_states*(abund - min))/(max - min)
+#        if w == num_states:
+#            w -= 1
+        return math.floor(w)
 
 
