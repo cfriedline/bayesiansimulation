@@ -23,7 +23,7 @@ elif 'phylogeny' in hostname:
     mb = '/home/cfriedline/src/mrbayes_3.2.1/src/mb'
     procs = 8
     project_dir = '/home/cfriedline/projects/bsim_dacc'
-    n_gen = 1000000
+    n_gen = 100000000
 
 run_dir_name = datetime.datetime.now().strftime("%m%d%y_%H%M%S")
 result_dir = app.create_dir(os.path.join(project_dir, "results"))
@@ -93,7 +93,7 @@ def main():
     sample_names = get_sample_names(samples)
     data = get_otu_data(samples)
     ranges = get_column_ranges(data)
-    gap = app.restandardize_matrix(data, ranges)
+    gap = app.restandardize_matrix(data, ranges, num_states=8)
     print_gap(gap, header, sample_names)
     disc = app.get_discrete_matrix_from_standardized(gap, 3, sample_names)
     assert isinstance(disc, robjects.Matrix)

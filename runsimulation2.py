@@ -38,7 +38,7 @@ elif 'phylogeny' in hostname:
     n_gen = 1000000
 
 run_dir_name = datetime.datetime.now().strftime("%m%d%y_%H%M%S")
-run_dir_name = "test"
+run_dir_name = "test2"
 result_dir = app.create_dir(os.path.join(project_dir, "results"))
 run_dir = app.create_dir(os.path.join(result_dir, run_dir_name))
 out_dir = app.create_dir(os.path.join(run_dir, "out"))
@@ -90,6 +90,7 @@ def get_bad_cols(ranges):
             bad.append(i)
     return bad
 
+
 def print_matrix(matrix, prefix, sample_names, num_cols, run, numpy, roots):
     fh = open(os.path.join(log_dir, "%s_%d_%d.txt" % (prefix, num_cols, run)), "w")
     m = matrix
@@ -101,17 +102,20 @@ def print_matrix(matrix, prefix, sample_names, num_cols, run, numpy, roots):
         for i, row in enumerate(m):
             fh.write("%s\t%s\n" % (sample_names[i], '\t'.join([str(int(elem)) for elem in row])))
 
+
 def print_ranges(ranges, num_cols, run):
     fh = open(os.path.join(log_dir, "ranges_%d_%d.txt" % (num_cols, run)), "w")
     with fh:
         for i, range in enumerate(ranges):
             fh.write("%d\t%s\n" % (i, '\t'.join([str(int(elem)) for elem in range])))
 
+
 def print_matrices(data, gap, abund, ranges, num_cols, run, sample_names, roots):
     print_matrix(data, "data", sample_names, num_cols, run, True, roots)
     print_matrix(gap, "gap", sample_names, num_cols, run, True, None)
     print_matrix(abund, "abund", sample_names, num_cols, run, True, None)
     print_ranges(ranges, num_cols, run)
+
 
 @clockit
 def print_state_distribution(data, num_cols, run, sample_names, dist_file):
@@ -161,6 +165,7 @@ def print_sample_trees(r, tree, num_taxa, num_cols, run):
     with fh:
         fh.write("%s;\n" % tree.as_newick_string())
 
+
 def curate_data_matrix(r, data, ranges):
     badcols = get_bad_cols(ranges)
     drop_string = ','.join([str(elem + 1) for elem in badcols])
@@ -175,6 +180,7 @@ def curate_data_matrix(r, data, ranges):
 def get_tab_string(tuple):
     return '\t'.join([str(elem) for elem in tuple])
 
+
 @clockit
 def store_valid_matrix_data(r, taxa_tree, num_cols, num_states):
     print "Storing valid matrix data in R session"
@@ -184,6 +190,25 @@ def store_valid_matrix_data(r, taxa_tree, num_cols, num_states):
     r("data = t(apply(data, 1, as.numeric))")
     robjects.globalenv['colnames'] = sorted(taxa_tree.taxon_set.labels())
     r('colnames(data) = colnames')
+
+
+def get_unifrac_pcoa(tree, matrix, rownames):
+    uni_tree = app.get_unifrac_pcoa_tree(matrix, rownames)
+    uni_diff = app.calculate_differences_r(tree, uni_tree)
+    return uni_tree, uni_diff
+
+
+def get_unifrac_cluster(tree, matrix, rownames):
+    uni_tree = app.get_py_unifrac_cluster(matrix, rownames)
+    uni_diff = app.calculate_differences_r(tree, uni_tree)
+    return uni_tree, uni_diff
+
+
+def get_unifrac_nj(tree, matrix, rownames):
+    uni_tree = app.get_unifrac_nj(matrix, rownames)
+    uni_diff = app.calculate_differences_r(tree, uni_tree)
+    return uni_tree, uni_diff
+
 
 @clockit
 def run_simulation(r, taxa_tree, num_cols, run, out_file, dist_file):
@@ -200,14 +225,18 @@ def run_simulation(r, taxa_tree, num_cols, run, out_file, dist_file):
     data, ranges = curate_data_matrix(r, data, ranges)
     gap = app.restandardize_matrix(data, ranges, num_states = 4)
     abund_ranges = app.get_range_from_gamma(num_cols * 2, 2, 1, 1000, app.compute_smallest_max())
-    abund = app.get_abundance_matrix(gap, abund_ranges, "gamma", num_states=4)
+    abund = app.get_abundance_matrix(gap, abund_ranges, "gamma", num_states = 4)
     (u_uni_matrix, u_uni_rownames), (w_uni_matrix, w_uni_rownames) = app.calculate_unifrac(abund, sample_names,
                                                                                            taxa_tree)
-    u_unifrac_pcoa_tree = app.get_unifrac_pcoa_tree(u_uni_matrix, u_uni_rownames)
-    w_unifrac_pcoa_tree = app.get_unifrac_pcoa_tree(w_uni_matrix, w_uni_rownames)
 
-    u_unifrac_pcoa_diffs = app.calculate_differences_r(tree, u_unifrac_pcoa_tree)
-    w_unifrac_pcoa_diffs = app.calculate_differences_r(tree, w_unifrac_pcoa_tree)
+    u_unifrac_pcoa_tree, u_unifrac_pcoa_diffs = get_unifrac_pcoa(tree, u_uni_matrix, u_uni_rownames)
+    w_unifrac_pcoa_tree, w_unifrac_pcoa_diffs = get_unifrac_pcoa(tree, w_uni_matrix, w_uni_rownames)
+
+    u_unifrac_cluster_tree, u_unifrac_cluster_diffs = get_unifrac_cluster(tree, u_uni_matrix, u_uni_rownames)
+    w_unifrac_cluster_tree, w_unifrac_cluster_diffs = get_unifrac_cluster(tree, w_uni_matrix, w_uni_rownames)
+
+    u_unifrac_nj_tree, u_unifrac_nj_diffs = get_unifrac_nj(tree, u_uni_matrix, u_uni_rownames)
+    w_unifrac_nj_ree, w_unifrac_nj_diffs = get_unifrac_nj(tree, w_uni_matrix, w_uni_rownames)
 
     disc = app.get_discrete_matrix_from_standardized(gap, 2, sample_names)
     mb_tree = app.run_mrbayes(run, disc, sample_names, disc.ncol, n_gen, mpi, mb, procs, None, run_dir,
@@ -215,12 +244,17 @@ def run_simulation(r, taxa_tree, num_cols, run, out_file, dist_file):
                               "d")
     mb_diffs = app.calculate_differences_r(tree, mb_tree)
 
-    out_file.write("%d\t%d\t%s\t%s\t%s\n" % (run, num_cols,
-                                             get_tab_string(mb_diffs),
-                                             get_tab_string(u_unifrac_pcoa_diffs),
-                                             get_tab_string(w_unifrac_pcoa_diffs)))
+    out_file.write("%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (run, num_cols,
+                                                             get_tab_string(mb_diffs),
+                                                             get_tab_string(u_unifrac_pcoa_diffs),
+                                                             get_tab_string(u_unifrac_cluster_diffs),
+                                                             get_tab_string(u_unifrac_nj_diffs),
+                                                             get_tab_string(w_unifrac_pcoa_diffs),
+                                                             get_tab_string(w_unifrac_cluster_diffs),
+                                                             get_tab_string(w_unifrac_cluster_diffs)))
     out_file.flush()
     print_matrices(data, gap, abund, abund_ranges, num_cols, run, sample_names, roots)
+
 
 def print_taxa_tree(tree, num_cols):
     assert isinstance(tree, dendropy.Tree)
@@ -236,10 +270,23 @@ def print_taxa_tree(tree, num_cols):
     with fh:
         fh.write("%s;\n" % tree.as_newick_string())
 
+
+def get_header():
+    return "run\tcols\t"\
+           "mb_topo\tmb_sym\tmb_path\t"\
+           "u_pcoa_topo\tu_pcoa_symm\tu_pcoa_path\t"\
+           "u_cluster_topo\tu_cluster_symm\tu_cluster_path\t"\
+           "u_nj_topo\tu_nj_symm\tu_nj_path\t"\
+           "w_pcoa_topo\tw_pcoa_symm\tw_pcoa_path\t"\
+           "w_cluster_topo\tw_cluster_symm\tw_cluster_path\t"\
+           "w_nj_topo\tw_nj_symm\tw_nj_path"
+
+
 @clockit
 def main():
     r = create_R()
     out_file = open(os.path.join(out_dir, "out.txt"), "w")
+    out_file.write("%s\n" % get_header())
     dist_file = open(os.path.join(out_dir, "dists.txt"), "w")
     for col in cols:
         tree = app.create_tree(col, "T")
