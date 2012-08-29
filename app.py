@@ -436,6 +436,18 @@ def find_usable_length(num_cols, bits):
     return max([x for x in range(num_cols + 1) if x % bits ** 2 == 0])
 
 
+def _append_gap_ranges(data, states):
+    for range in data:
+        d = range[2]
+        for i in xrange(int(range[0]), int(range[1]) + 1):
+            weight = int(compute_weight(states, i, range[1], range[0]))
+            if weight in d:
+                d[weight][1] = i
+            else:
+                d[weight] = [None] * 2
+                d[weight][0]= i
+
+
 def get_range_from_gamma(num_cols, bits, gamma_shape, gamma_scale, smallest_max):
     """
     gets a range of random column totals from a gamma distribution
@@ -451,6 +463,8 @@ def get_range_from_gamma(num_cols, bits, gamma_shape, gamma_scale, smallest_max)
     for x in xrange(0, find_usable_length(num_cols, bits) / bits):
         nums = get_random_min_and_max_from_gamma(gamma_shape, gamma_scale, smallest_max)
         data.append(nums)
+    states = int("1" * bits, 2) + 1
+    _append_gap_ranges(data, states)
     return numpy.array(data)
 
 
@@ -470,6 +484,8 @@ def get_range_from_normal(num_cols, bits, mean, sd, smallest_max):
     for x in xrange(0, find_usable_length(num_cols, bits) / bits):
         nums = get_random_min_and_max_from_normal(mean, sd, smallest_max)
         data.append(nums)
+    states = int("1" * bits, 2) + 1
+    _append_gap_ranges(data, states)
     return numpy.array(data)
 
 
@@ -485,7 +501,7 @@ def get_random_min_and_max_from_normal(mean, sd, smallest_max):
     while max < smallest_max:
         max = get_random_from_normal(mean, sd)
     smallest_max = round(numpy.random.uniform(low = 0.0, high = max / 8.0))
-    return smallest_max, max
+    return smallest_max, max, {}
 
 
 def get_random_min_and_max_from_gamma(gamma_shape, gamma_scale, min):
@@ -500,7 +516,7 @@ def get_random_min_and_max_from_gamma(gamma_shape, gamma_scale, min):
     while max < min:
         max = get_random_from_gamma(gamma_shape, gamma_scale)
     min = round(numpy.random.uniform(low = 0.0, high = max / 8.0))
-    return min, max
+    return min, max, {}
 
 
 def get_random_from_normal(mean, sd):
@@ -612,7 +628,7 @@ def find_range(weight, abund, max, min, num_states):
     return lower, upper
 
 
-def get_random_abundance(weight, abund, max, min, num_states):
+def get_random_abundance(weight, col_range):
     """
     gets a random abundance given for an OTU by drawing from
     a uniform distribution on the range interval
@@ -624,7 +640,7 @@ def get_random_abundance(weight, abund, max, min, num_states):
     @return: the abundance
     @rypte: int
     """
-    r = find_range(weight, abund, max, min, num_states)
+    r = col_range[2][weight]
     rand = numpy.random.uniform(low = r[0], high = r[1])
     return round(rand)
 
@@ -648,21 +664,21 @@ def get_abundance_matrix(gap, ranges, dist, num_states):
     for i, row in enumerate(gap):
         data.append([None] * len(col_min))
         for j, weight in enumerate(row):
-            abund = round(((weight*(ranges[j][1] - ranges[j][0]))/num_states) + ranges[j][0])
+            abund = round(((weight * (ranges[j][1] - ranges[j][0])) / num_states) + ranges[j][0])
             if weight == 0.0:
                 if col_min[j] is False:
                     data[i][j] = ranges[j][0]
                     col_min[j] = True
                 else:
-                    data[i][j] = get_random_abundance(weight, abund, ranges[j][1], ranges[j][0], num_states)
+                    data[i][j] = get_random_abundance(weight, ranges[j])
             elif weight == (num_states - 1):
                 if col_max[j] is False:
                     data[i][j] = ranges[j][1]
                     col_max[j] = True
                 else:
-                    data[i][j] = get_random_abundance(weight, abund, ranges[j][1], ranges[j][0], num_states)
+                    data[i][j] = get_random_abundance(weight, ranges[j])
             else:
-                data[i][j] = get_random_abundance(weight, abund, ranges[j][1], ranges[j][0], num_states)
+                data[i][j] = get_random_abundance(weight, ranges[j])
     return data
 
 
@@ -1007,19 +1023,23 @@ def get_unifrac_nj(matrix, rownames):
     return ape_to_dendropy(tree)
 
 
-def get_bc_nj():
+def get_bc_nj(abund, sample_names):
     """
     Gets an nj tree from bray curtis distance matrix in r
     @return: a denropy tree
     @rtype: dendropy.Tree
     """
     r = robjects.r
+    robjects.globalenv['abund'] = robjects.conversion.py2ri(numpy.array(abund))
+    robjects.globalenv['sample_names'] = sample_names
+    r('rownames(abund) = sample_names')
+    r('bc = vegdist(abund)')
     r('bc_nj = nj(bc)')
     tree = r('multi2di(bc_nj)')
     return ape_to_dendropy(tree)
 
 
-def get_bc_pcoa_tree():
+def get_bc_pcoa_tree(abund, sample_names):
     """
     Gets a tree from the first two pcoa ordination axes of the bray curtis matrix
     The axes are used to create a euclidian distance matrix, this matrix is
@@ -1028,6 +1048,10 @@ def get_bc_pcoa_tree():
     @rtype: dendropy.Tree
     """
     r = robjects.r
+    robjects.globalenv['abund'] = robjects.conversion.py2ri(numpy.array(abund))
+    robjects.globalenv['sample_names'] = sample_names
+    r('rownames(abund) = sample_names')
+    r('bc = vegdist(abund)')
     r('bc_pcoa = pcoa(bc)')
     r("bc_pcoa_euclid = vegdist(bc_pcoa$vectors[,1:2], 'euc')")
     r("bc_pcoa_clust = hclust(bc_pcoa_euclid, 'ave')")
