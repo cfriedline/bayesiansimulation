@@ -20,10 +20,13 @@ mb_old = "/Users/chris/src/mrbayes-3.1.2/mb"
 mb_new = "/Users/chris/src/mrbayes_3.2.1/src/mb"
 mb = mb_old
 procs = 4
-num_taxa = 4
+num_taxa = 8
 num_states = 8
+bits = 3
 runs = 10
 cols = [100, 1000, 9000]
+gamma_shape = 1
+gamma_scale = 10000
 
 if 'godel' in hostname:
     mpi = '/test/riveralab/cfriedline/bin/mpirun'
@@ -37,7 +40,12 @@ elif 'phylogeny' in hostname:
     project_dir = '/home/cfriedline/projects/bsim_maria'
     n_gen = 1000000
 
-description = ["4-2-8", "4 samples, 2 bit encoding, 8 states"]
+if num_taxa > 4:
+    mb = mb_new
+    n_gen = 300000
+
+description = ["%d-%d-%d" % (num_taxa, bits, num_states),
+               "%d samples, %d bit encoding, %d states" % (num_taxa, bits, num_states)]
 run_dir_name = datetime.datetime.now().strftime("%m%d%y_%H%M%S")
 run_dir_name = description[0]
 result_dir = app.create_dir(os.path.join(project_dir, "results"))
@@ -61,7 +69,7 @@ def create_R():
             found = 0
             while (found < cols) {
                 root = sample(numstates)[1]
-                temp = rTraitDisc(tree, model="ER", k=numstates, states=1:numstates, rate=0.1, root.value=root)
+                temp = rTraitDisc(tree, model="ER", k=numstates, states=1:numstates, rate=1, root.value=root)
                 temp = as.matrix(temp)
                 if (min(temp) < max(temp)) {
                     if (found == 0) {
@@ -185,6 +193,7 @@ def curate_data_matrix(r, data, ranges):
 def get_tab_string(tuple):
     return '\t'.join([str(int(elem)) for elem in tuple])
 
+
 @clockit
 def store_valid_matrix_data(r, taxa_tree, num_cols, num_states):
     print "Storing valid matrix data in R session"
@@ -245,9 +254,10 @@ def run_simulation(r, taxa_tree, num_cols, run, out_file, dist_file):
     print_state_distribution(data, num_cols, run, sample_names, dist_file)
     ranges = get_column_ranges(data)
     data, ranges = curate_data_matrix(r, data, ranges)
-    gap = app.restandardize_matrix(data, ranges, num_states = 4)
-    abund_ranges = app.get_range_from_gamma(num_cols * 2, 2, 1, 1000, app.compute_smallest_max())
-    abund = app.get_abundance_matrix(gap, abund_ranges, "gamma", num_states = 4)
+    gap = app.restandardize_matrix(data, ranges, num_states)
+    abund_ranges = app.get_range_from_gamma(num_cols * bits, bits, gamma_shape, gamma_scale, app.compute_smallest_max())
+    abund = app.get_abundance_matrix(gap, abund_ranges, "gamma", num_states)
+    print_matrices(data, gap, abund, abund_ranges, num_cols, run, sample_names, roots)
     (u_matrix, u_names), (w_matrix, w_names) = app.calculate_unifrac(abund, sample_names, taxa_tree)
 
     # unifrac tests
@@ -265,7 +275,7 @@ def run_simulation(r, taxa_tree, num_cols, run, out_file, dist_file):
     bc_nj_tree, bc_nj_diffs = get_bc_nj(tree, abund, sample_names)
 
     # mrbayes
-    disc = app.get_discrete_matrix_from_standardized(gap, 2, sample_names)
+    disc = app.get_discrete_matrix_from_standardized(gap, bits, sample_names)
     mb_tree = app.run_mrbayes(run, disc,
                               sample_names, disc.ncol,
                               n_gen, mpi,
@@ -287,7 +297,6 @@ def run_simulation(r, taxa_tree, num_cols, run, out_file, dist_file):
                                                                          get_tab_string(bc_cluster_diffs),
                                                                          get_tab_string(bc_nj_diffs)))
     out_file.flush()
-    print_matrices(data, gap, abund, abund_ranges, num_cols, run, sample_names, roots)
 
 
 def print_taxa_tree(tree, num_cols):
@@ -326,10 +335,11 @@ def main():
     out_file.write("%s\n" % get_header())
     dist_file = open(os.path.join(out_dir, "dists.txt"), "w")
     for col in cols:
-        tree = app.create_tree(col, "T")
-        print_taxa_tree(tree, col)
+        usable = app.find_usable_length(col, bits)
+        tree = app.create_tree(usable, "T")
+        print_taxa_tree(tree, usable)
         for run in xrange(runs):
-            run_simulation(r, tree, col, run, out_file, dist_file)
+            run_simulation(r, tree, usable, run, out_file, dist_file)
     out_file.close()
     dist_file.close()
 
