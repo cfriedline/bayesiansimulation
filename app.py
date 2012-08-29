@@ -664,7 +664,7 @@ def get_abundance_matrix(gap, ranges, dist, num_states):
     for i, row in enumerate(gap):
         data.append([None] * len(col_min))
         for j, weight in enumerate(row):
-            abund = round(((weight * (ranges[j][1] - ranges[j][0])) / num_states) + ranges[j][0])
+#            abund = round(((weight * (ranges[j][1] - ranges[j][0])) / num_states) + ranges[j][0])
             if weight == 0.0:
                 if col_min[j] is False:
                     data[i][j] = ranges[j][0]
