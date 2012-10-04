@@ -1,4 +1,7 @@
 __author__ = 'chris'
+
+# uses constant branch length on the sample trees
+
 import numpy
 import app
 import rpy2.robjects as robjects
@@ -8,13 +11,14 @@ from rpy2.robjects import numpy2ri
 from app import clockit
 import dendropy
 import sys
-import stopwatch
+import multiprocessing as mp
+import argparse
 
 numpy2ri.activate()
 sys.setrecursionlimit(1000000)
 
 hostname = os.uname()[1]
-project_dir = "/Users/chris/projects/bsim_maria"
+project_dir = "/Users/chris/projects/bsim3"
 n_gen = 100000
 mpi = "/opt/local/bin/mpirun"
 mb_old = "/Users/chris/src/mrbayes-3.1.2/mb"
@@ -24,23 +28,26 @@ procs = 4
 num_taxa = 8
 num_states = 8
 bits = 3
-runs = 50
+runs = 3
+distance_runs = 3
 rate = 1.0
+brlen = 0.5
 cols = [100, 1000, 9000]
+cols = [1000]
 gamma_shape = 1
-gamma_scale = 10000
+gamma_scale = 1000
 
 if 'godel' in hostname:
     mpi = '/test/riveralab/cfriedline/bin/mpirun'
     mb = '/test/riveralab/cfriedline/src/mrbayes_3.2.1/src/mb'
     procs = 8
-    project_dir = '/home/cfriedline/projects/bsim_maria'
+    project_dir = '/home/cfriedline/projects/bsim3'
     mb_new = mb
 elif 'phylogeny' in hostname:
     mpi = '/usr/local/bin/mpirun'
     mb = '/home/cfriedline/src/mrbayes_3.2.1/src/mb'
     procs = 8
-    project_dir = '/home/cfriedline/projects/bsim_maria'
+    project_dir = '/home/cfriedline/projects/bsim3'
     n_gen = 1000000
     mb_new = mb
 
@@ -48,8 +55,8 @@ if num_taxa > 4:
     mb = mb_new
     n_gen = 500000
 
-description = ["%d-%d-%d-%d-%.1f" % (num_taxa, bits, num_states, runs, rate),
-               "%d samples, %d bit encoding, %d states, %d runs, rate=%f" % (num_taxa, bits, num_states, runs, rate)]
+description = ["%d-%d-%d-%d-%.1f-%.1f" % (num_taxa, bits, num_states, runs, rate, brlen),
+               "%d samples, %d bit encoding, %d states, %d runs, rate=%f, brlen=%f" % (num_taxa, bits, num_states, runs, rate, brlen)]
 run_dir_name = datetime.datetime.now().strftime("%m%d%y_%H%M%S")
 run_dir_name = description[0]
 result_dir = app.create_dir(os.path.join(project_dir, "results"))
@@ -117,8 +124,8 @@ def get_bad_cols(ranges):
     return bad
 
 
-def print_matrix(matrix, prefix, sample_names, num_cols, run, numpy, roots):
-    fh = open(os.path.join(log_dir, "%s_%d_%d.txt" % (prefix, num_cols, run)), "w")
+def print_matrix(matrix, prefix, sample_names, num_cols, run, numpy, roots, i):
+    fh = open(os.path.join(log_dir, "%s_%d_%d_%d.txt" % (prefix, num_cols, run, i)), "w")
     m = matrix
     if not numpy:
         m = numpy.asarray(matrix)
@@ -136,10 +143,10 @@ def print_ranges(ranges, num_cols, run):
             fh.write("%d\t%s\n" % (i, '\t'.join([str(int(elem)) for elem in range[0:2]])))
 
 
-def print_matrices(data, gap, abund, ranges, num_cols, run, sample_names, roots):
-    print_matrix(data, "data", sample_names, num_cols, run, True, roots)
-    print_matrix(gap, "gap", sample_names, num_cols, run, True, None)
-    print_matrix(abund, "abund", sample_names, num_cols, run, True, None)
+def print_matrices(data, gap, abund, ranges, num_cols, run, sample_names, roots, i):
+    print_matrix(data, "data", sample_names, num_cols, run, True, roots, i)
+    print_matrix(gap, "gap", sample_names, num_cols, run, True, None, i)
+    print_matrix(abund, "abund", sample_names, num_cols, run, True, None, i)
     print_ranges(ranges, num_cols, run)
 
 
@@ -260,8 +267,10 @@ def get_gap_weight(abund, min, max, states):
     except:
         print max, min
 
+def fake(i):
+    print "fake", i
 
-@clockit
+
 def get_abundance_ranges(r, gap, num_states):
     num = len(gap[0])
     ranges = []
@@ -269,24 +278,6 @@ def get_abundance_ranges(r, gap, num_states):
         ranges.append(app.get_random_min_and_max_from_gamma(gamma_shape, gamma_scale, app.compute_smallest_max()))
 
     for i, range in enumerate(ranges):
-#        range.append([])
-#        t1 = stopwatch.Timer()
-#        for i in xrange(num_states):
-#            range[2].append([-1] * 2)
-#
-#        counts = [0] * num_states
-#        for i in xrange(int(range[0]), int(range[1]) + 1):
-#            w = int(get_gap_weight(i, range[0], range[1], num_states))
-#            counts[w] += 1
-#
-#        min = range[0]
-#        for i, count in enumerate(counts):
-#            range[2][i][0] = min
-#            range[2][i][1] = min + count - 1
-#            min += count
-#        t1.stop()
-#
-#        t2 = stopwatch.Timer()
         for i in xrange(num_states):
             range[2].append([-1] * 2)
         r("range=matrix(%d:%d)" % (range[0], range[1]))
@@ -297,16 +288,57 @@ def get_abundance_ranges(r, gap, num_states):
             range[2][i][0] = min
             range[2][i][1] = min + count - 1
             min += count
-#        t2.stop()
-#        range_fh.write("%d\t%s\t%s\n" % ((range[1] - range[0]) + 1, t1, t2))
-#        range_fh.flush()
     return ranges
+
+def get_column(matrix, i):
+    return [row[i] for row in matrix]
+
+@clockit
+def create_abund_pool(r, gap, num_states):
+    pool = mp.Pool()
+    results = []
+    for i in xrange(distance_runs):
+        results.append(pool.apply_async(get_abundance_ranges, (r, gap, num_states)))
+    pool.close()
+    pool.join()
+    abund_pool = []
+    for r in results:
+        abund_pool.append(r.get())
+    return abund_pool
+
+@clockit
+def create_abund_pool_from_states(r, data):
+    data2 = numpy.ndarray(data.shape)
+    for i in xrange(len(data)):
+        for j in xrange(len(data[i])):
+            data2[i][j] = data[i][j] - 1
+    pool = mp.Pool()
+    results = []
+    for i in xrange(distance_runs):
+        results.append(pool.apply_async(get_abundance_ranges, (r, data2, num_states)))
+    pool.close()
+    pool.join()
+    abund_pool = []
+    for r in results:
+        abund_pool.append(r.get())
+    return abund_pool, data2
+
+def run_mr_bayes(run, i, disc, sample_names, orig_tree):
+    mb_tree = app.run_mrbayes(str(run) + "-" + str(i), disc,
+                           sample_names, disc.ncol,
+                           n_gen, mpi,
+                           mb, procs,
+                           None, run_dir,
+                           len(sample_names), "d")
+    diffs = app.calculate_differences_r(orig_tree, mb_tree)
+    return mb_tree, diffs
 
 
 @clockit
-def run_simulation(r, taxa_tree, num_cols, run, out_file, dist_file):
+def run_simulation(r, taxa_tree, num_cols, run, out_file, dist_file, abundance_from_states):
     assert isinstance(taxa_tree, dendropy.Tree)
-    r('tree = rtree(%d)' % num_taxa)
+    r('tree = rtree(%d, rooted=F)' % num_taxa)
+    r('tree$edge.length = rep(%f, length(tree$edge.length))' % brlen)
     tree = app.ape_to_dendropy(r['tree'])
     store_valid_matrix_data(r, taxa_tree, num_cols, num_states)
     data = numpy.asarray(r['data'])
@@ -314,54 +346,103 @@ def run_simulation(r, taxa_tree, num_cols, run, out_file, dist_file):
     sample_names = numpy.asarray(r('rownames(data)'))
     print_sample_trees(r, tree, num_taxa, num_cols, run)
     print_state_distribution(data, num_cols, run, sample_names, dist_file)
-    ranges = get_column_ranges(data)
-    data, ranges = curate_data_matrix(r, data, ranges)
-    gap = app.restandardize_matrix(data, ranges, num_states)
-    abund_ranges = get_abundance_ranges(r, gap, num_states)
-    #    abund_ranges = app.get_range_from_gamma(num_cols * bits, bits, gamma_shape, gamma_scale, app.compute_smallest_max(),
-    #                                            accept_cols = True)
+    gap = None
+    if not abundance_from_states:
+        ranges = get_column_ranges(data)
+        data, ranges = curate_data_matrix(r, data, ranges)
+        gap = app.restandardize_matrix(data, ranges, num_states)
 
-    abund = app.get_abundance_matrix(gap, abund_ranges, "gamma", num_states)
-    print_matrices(data, gap, abund, abund_ranges, num_cols, run, sample_names, roots)
-    (u_matrix, u_names), (w_matrix, w_names) = app.calculate_unifrac(abund, sample_names, taxa_tree)
 
-    # unifrac tests
-    u_pcoa_tree, u_pcoa_diffs = get_unifrac_pcoa(tree, u_matrix, u_names)
-    u_cluster_tree, u_cluster_diffs = get_unifrac_cluster(tree, u_matrix, u_names)
-    u_nj_tree, u_nj_diffs = get_unifrac_nj(tree, u_matrix, u_names)
+    u_pcoa_diffs_total = []
+    u_cluster_diffs_total = []
+    u_nj_diffs_total = []
 
-    w_pcoa_tree, w_pcoa_diffs = get_unifrac_pcoa(tree, w_matrix, w_names)
-    w_cluster_tree, w_cluster_diffs = get_unifrac_cluster(tree, w_matrix, w_names)
-    w_nj_tree, w_nj_diffs = get_unifrac_nj(tree, w_matrix, w_names)
+    w_pcoa_diffs_total = []
+    w_cluster_diffs_total = []
+    w_nj_diffs_total = []
 
-    # bray-curtis tests
-    bc_pcoa_tree, bc_pcoa_diffs = get_bc_pcoa(tree, abund, sample_names)
-    bc_cluster_tree, bc_cluster_diffs = get_bc_cluster(tree, abund, sample_names)
-    bc_nj_tree, bc_nj_diffs = get_bc_nj(tree, abund, sample_names)
+    bc_pcoa_diffs_total = []
+    bc_cluster_diffs_total = []
+    bc_nj_diffs_total = []
+    mb_diffs_total = []
+
+    abund_pool = None
+    if not abundance_from_states:
+        abund_pool = create_abund_pool(r, gap, num_states)
+    else:
+        abund_pool, gap = create_abund_pool_from_states(r, data)
+
+
+    for i in xrange(distance_runs):
+        abund_ranges = abund_pool[i]
+        abund = app.get_abundance_matrix(gap, abund_ranges, "gamma", num_states)
+        print_matrices(data, gap, abund, abund_ranges, num_cols, run, sample_names, roots, i)
+        (u_matrix, u_names), (w_matrix, w_names) = app.calculate_unifrac(abund, sample_names, taxa_tree)
+
+        # unifrac tests
+        u_pcoa_tree, u_pcoa_diffs = get_unifrac_pcoa(tree, u_matrix, u_names)
+        u_pcoa_diffs_total.append(u_pcoa_diffs)
+        u_cluster_tree, u_cluster_diffs = get_unifrac_cluster(tree, u_matrix, u_names)
+        u_cluster_diffs_total.append(u_cluster_diffs)
+        u_nj_tree, u_nj_diffs = get_unifrac_nj(tree, u_matrix, u_names)
+        u_nj_diffs_total.append(u_nj_diffs)
+
+        w_pcoa_tree, w_pcoa_diffs = get_unifrac_pcoa(tree, w_matrix, w_names)
+        w_pcoa_diffs_total.append(w_pcoa_diffs)
+        w_cluster_tree, w_cluster_diffs = get_unifrac_cluster(tree, w_matrix, w_names)
+        w_cluster_diffs_total.append(w_cluster_diffs)
+        w_nj_tree, w_nj_diffs = get_unifrac_nj(tree, w_matrix, w_names)
+        w_nj_diffs_total.append(w_nj_diffs)
+
+        # bray-curtis tests
+        bc_pcoa_tree, bc_pcoa_diffs = get_bc_pcoa(tree, abund, sample_names)
+        bc_pcoa_diffs_total.append(bc_pcoa_diffs)
+        bc_cluster_tree, bc_cluster_diffs = get_bc_cluster(tree, abund, sample_names)
+        bc_cluster_diffs_total.append(bc_cluster_diffs)
+        bc_nj_tree, bc_nj_diffs = get_bc_nj(tree, abund, sample_names)
+        bc_nj_diffs_total.append(bc_nj_diffs)
+
+        if abundance_from_states:
+            gap_from_abund = app.restandardize_matrix(abund, abund_ranges, num_states)
+            disc = app.get_discrete_matrix_from_standardized(gap_from_abund, bits, sample_names)
+            mb_tree, mb_diffs = run_mr_bayes(run, i, disc, sample_names, tree)
+            mb_diffs_total.append(mb_diffs)
+
 
     # mrbayes
-    disc = app.get_discrete_matrix_from_standardized(gap, bits, sample_names)
-    mb_tree = app.run_mrbayes(run, disc,
-                              sample_names, disc.ncol,
-                              n_gen, mpi,
-                              mb, procs,
-                              None, run_dir,
-                              len(sample_names), "d")
-    mb_diffs = app.calculate_differences_r(tree, mb_tree)
+    disc = None
+    if not abundance_from_states:
+        disc = app.get_discrete_matrix_from_standardized(gap, bits, sample_names)
+        mb_tree, mb_diffs = run_mr_bayes(run, 0, disc, sample_names, tree)
+        mb_diffs_total.append(mb_diffs)
 
     # output
-    out_file.write("%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (run, num_cols,
-                                                                         get_tab_string(mb_diffs),
-                                                                         get_tab_string(u_pcoa_diffs),
-                                                                         get_tab_string(u_cluster_diffs),
-                                                                         get_tab_string(u_nj_diffs),
-                                                                         get_tab_string(w_pcoa_diffs),
-                                                                         get_tab_string(w_cluster_diffs),
-                                                                         get_tab_string(w_nj_diffs),
-                                                                         get_tab_string(bc_pcoa_diffs),
-                                                                         get_tab_string(bc_cluster_diffs),
-                                                                         get_tab_string(bc_nj_diffs)))
-    out_file.flush()
+    for i in xrange(distance_runs):
+        if not abundance_from_states:
+            out_file.write("%d\t%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (run, num_cols, i,
+                                                                     get_tab_string(mb_diffs_total[0]),
+                                                                     get_tab_string(u_pcoa_diffs_total[i]),
+                                                                     get_tab_string(u_cluster_diffs_total[i]),
+                                                                     get_tab_string(u_nj_diffs_total[i]),
+                                                                     get_tab_string(w_pcoa_diffs_total[i]),
+                                                                     get_tab_string(w_cluster_diffs_total[i]),
+                                                                     get_tab_string(w_nj_diffs_total[i]),
+                                                                     get_tab_string(bc_pcoa_diffs_total[i]),
+                                                                     get_tab_string(bc_cluster_diffs_total[i]),
+                                                                     get_tab_string(bc_nj_diffs_total[i])))
+        else:
+            out_file.write("%d\t%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (run, num_cols, i,
+                                                                     get_tab_string(mb_diffs_total[i]),
+                                                                     get_tab_string(u_pcoa_diffs_total[i]),
+                                                                     get_tab_string(u_cluster_diffs_total[i]),
+                                                                     get_tab_string(u_nj_diffs_total[i]),
+                                                                     get_tab_string(w_pcoa_diffs_total[i]),
+                                                                     get_tab_string(w_cluster_diffs_total[i]),
+                                                                     get_tab_string(w_nj_diffs_total[i]),
+                                                                     get_tab_string(bc_pcoa_diffs_total[i]),
+                                                                     get_tab_string(bc_cluster_diffs_total[i]),
+                                                                     get_tab_string(bc_nj_diffs_total[i])))
+        out_file.flush()
 
 
 def print_taxa_tree(tree, num_cols):
@@ -380,7 +461,7 @@ def print_taxa_tree(tree, num_cols):
 
 
 def get_header():
-    return "run\tcols\t"\
+    return "run\tcols\titer\t"\
            "mb_topo\tmb_sym\tmb_path\t"\
            "u_pcoa_topo\tu_pcoa_symm\tu_pcoa_path\t"\
            "u_cluster_topo\tu_cluster_symm\tu_cluster_path\t"\
@@ -392,9 +473,17 @@ def get_header():
            "bc_cluster_topo\tbc_cluster_symm\tbc_cluster_path\t"\
            "bc_nj_topo\tbc_nj_symm\tbc_nj_path"
 
+def get_args():
+    p = argparse.ArgumentParser()
+    p.add_argument("--abundance_from_states", help="create abundance matrix directly from states", action="store_true", default=False)
+
+    args = p.parse_args()
+    args.abundance_from_states = True
+    return args
 
 @clockit
 def main():
+    args = get_args()
     r = create_R()
     out_file = open(os.path.join(out_dir, "out.txt"), "w")
     out_file.write("%s\n" % get_header())
@@ -403,7 +492,7 @@ def main():
         tree = app.create_tree(col, "T")
         print_taxa_tree(tree, col)
         for run in xrange(runs):
-            run_simulation(r, tree, col, run, out_file, dist_file)
+            run_simulation(r, tree, col, run, out_file, dist_file, args.abundance_from_states)
     out_file.close()
     dist_file.close()
 

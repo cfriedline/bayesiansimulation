@@ -1,4 +1,9 @@
+import traceback
+
 __author__ = 'chris'
+
+# uses constant branch length on the sample trees
+
 import numpy
 import app
 import rpy2.robjects as robjects
@@ -8,13 +13,15 @@ from rpy2.robjects import numpy2ri
 from app import clockit
 import dendropy
 import sys
-import stopwatch
+import multiprocessing as mp
+import argparse
+import random
 
 numpy2ri.activate()
 sys.setrecursionlimit(1000000)
 
 hostname = os.uname()[1]
-project_dir = "/Users/chris/projects/bsim_maria"
+project_dir = "/Users/chris/projects/asmw4"
 n_gen = 100000
 mpi = "/opt/local/bin/mpirun"
 mb_old = "/Users/chris/src/mrbayes-3.1.2/mb"
@@ -24,46 +31,27 @@ procs = 4
 num_taxa = 8
 num_states = 8
 bits = 3
-runs = 50
 rate = 1.0
-cols = [100, 1000, 9000]
 gamma_shape = 1
-gamma_scale = 10000
+gamma_scale = 1000
 
 if 'godel' in hostname:
     mpi = '/test/riveralab/cfriedline/bin/mpirun'
     mb = '/test/riveralab/cfriedline/src/mrbayes_3.2.1/src/mb'
     procs = 8
-    project_dir = '/home/cfriedline/projects/bsim_maria'
+    project_dir = '/home/cfriedline/projects/asmw4'
     mb_new = mb
 elif 'phylogeny' in hostname:
     mpi = '/usr/local/bin/mpirun'
     mb = '/home/cfriedline/src/mrbayes_3.2.1/src/mb'
     procs = 8
-    project_dir = '/home/cfriedline/projects/bsim_maria'
+    project_dir = '/home/cfriedline/projects/asmw2'
     n_gen = 1000000
     mb_new = mb
 
 if num_taxa > 4:
     mb = mb_new
     n_gen = 500000
-
-description = ["%d-%d-%d-%d-%.1f" % (num_taxa, bits, num_states, runs, rate),
-               "%d samples, %d bit encoding, %d states, %d runs, rate=%f" % (num_taxa, bits, num_states, runs, rate)]
-run_dir_name = datetime.datetime.now().strftime("%m%d%y_%H%M%S")
-run_dir_name = description[0]
-result_dir = app.create_dir(os.path.join(project_dir, "results"))
-run_dir = app.create_dir(os.path.join(result_dir, run_dir_name))
-out_dir = app.create_dir(os.path.join(run_dir, "out"))
-log_dir = app.create_dir(os.path.join(run_dir, "log"))
-log_file = open(os.path.join(log_dir, "log.txt"), "w")
-app.log_file = log_file
-
-desc = open(os.path.join(run_dir, "readme.txt"), "w")
-with desc:
-    desc.write("%s\n" % description[1])
-
-range_fh = open(os.path.join(log_dir, "range_time.txt"), "w")
 
 
 def create_R():
@@ -117,8 +105,8 @@ def get_bad_cols(ranges):
     return bad
 
 
-def print_matrix(matrix, prefix, sample_names, num_cols, run, numpy, roots):
-    fh = open(os.path.join(log_dir, "%s_%d_%d.txt" % (prefix, num_cols, run)), "w")
+def print_matrix(matrix, prefix, sample_names, num_cols, tree_num, numpy, roots, i, filedata):
+    fh = open(os.path.join(filedata['log_dir'], "%s_%d_%d_%d.txt" % (prefix, num_cols, tree_num, i)), "w")
     m = matrix
     if not numpy:
         m = numpy.asarray(matrix)
@@ -129,22 +117,25 @@ def print_matrix(matrix, prefix, sample_names, num_cols, run, numpy, roots):
             fh.write("%s\t%s\n" % (sample_names[i], '\t'.join([str(int(elem)) for elem in row])))
 
 
-def print_ranges(ranges, num_cols, run):
-    fh = open(os.path.join(log_dir, "ranges_%d_%d.txt" % (num_cols, run)), "w")
+def print_ranges(ranges, prefix, num_cols, run, filedata):
+    fh = open(os.path.join(filedata['log_dir'], "%s_%d_%d.txt" % (prefix, num_cols, run)), "w")
     with fh:
         for i, range in enumerate(ranges):
             fh.write("%d\t%s\n" % (i, '\t'.join([str(int(elem)) for elem in range[0:2]])))
 
 
-def print_matrices(data, gap, abund, ranges, num_cols, run, sample_names, roots):
-    print_matrix(data, "data", sample_names, num_cols, run, True, roots)
-    print_matrix(gap, "gap", sample_names, num_cols, run, True, None)
-    print_matrix(abund, "abund", sample_names, num_cols, run, True, None)
-    print_ranges(ranges, num_cols, run)
+def print_matrices(data, gap, abund, ranges, gap_abund, new_ranges, num_cols, tree_num, sample_names, roots, i, filedata):
+    print_matrix(data, "data", sample_names, num_cols, tree_num, True, roots, i, filedata)
+    print_matrix(gap, "gap", sample_names, num_cols, tree_num, True, None, i, filedata)
+    print_matrix(abund, "abund", sample_names, num_cols, tree_num, True, None, i, filedata)
+    print_matrix(gap_abund, "gap_abund", sample_names, num_cols, tree_num, True, None, i, filedata)
+    print_ranges(ranges, "ranges", num_cols, tree_num, filedata)
+    print_ranges(new_ranges, "new_ranges", num_cols, tree_num, filedata)
+
 
 
 @clockit
-def print_state_distribution(data, num_cols, run, sample_names, dist_file):
+def print_state_distribution(data, num_cols, tree_num, sample_names, dist_file):
     counts = [None] * len(data)
     for i, row in enumerate(data):
         rowdata = {}
@@ -163,7 +154,7 @@ def print_state_distribution(data, num_cols, run, sample_names, dist_file):
     keys = list(keys)
     keys.sort()
 
-    dist_file.write("%d, %d\n" % (num_cols, run))
+    dist_file.write("%d, %d\n" % (num_cols, tree_num))
     for i, d in enumerate(counts):
         s = sample_names[i]
         for key in keys:
@@ -177,10 +168,10 @@ def print_state_distribution(data, num_cols, run, sample_names, dist_file):
     dist_file.flush()
 
 
-def print_sample_trees(r, tree, num_taxa, num_cols, run):
+def print_sample_trees(r, tree, num_taxa, num_cols, tree_num, filedata):
     assert isinstance(tree, dendropy.Tree)
-    pdf_file = os.path.join(log_dir, "tree_%d_%d_%d.pdf" % (num_taxa, num_cols, run))
-    text_file = os.path.join(log_dir, "tree_%d_%d_%d.txt" % (num_taxa, num_cols, run))
+    pdf_file = os.path.join(filedata['log_dir'], "tree_%d_%d_%d.pdf" % (num_taxa, num_cols, tree_num))
+    text_file = os.path.join(filedata['log_dir'], "tree_%d_%d_%d.txt" % (num_taxa, num_cols, tree_num))
     r("pdf(file='%s')" % pdf_file)
     r('par(mfrow=c(1,2))')
     r("plot(tree, root.edge=T)")
@@ -261,7 +252,10 @@ def get_gap_weight(abund, min, max, states):
         print max, min
 
 
-@clockit
+def fake(i):
+    print "fake", i
+
+
 def get_abundance_ranges(r, gap, num_states):
     num = len(gap[0])
     ranges = []
@@ -269,24 +263,6 @@ def get_abundance_ranges(r, gap, num_states):
         ranges.append(app.get_random_min_and_max_from_gamma(gamma_shape, gamma_scale, app.compute_smallest_max()))
 
     for i, range in enumerate(ranges):
-#        range.append([])
-#        t1 = stopwatch.Timer()
-#        for i in xrange(num_states):
-#            range[2].append([-1] * 2)
-#
-#        counts = [0] * num_states
-#        for i in xrange(int(range[0]), int(range[1]) + 1):
-#            w = int(get_gap_weight(i, range[0], range[1], num_states))
-#            counts[w] += 1
-#
-#        min = range[0]
-#        for i, count in enumerate(counts):
-#            range[2][i][0] = min
-#            range[2][i][1] = min + count - 1
-#            min += count
-#        t1.stop()
-#
-#        t2 = stopwatch.Timer()
         for i in xrange(num_states):
             range[2].append([-1] * 2)
         r("range=matrix(%d:%d)" % (range[0], range[1]))
@@ -297,32 +273,97 @@ def get_abundance_ranges(r, gap, num_states):
             range[2][i][0] = min
             range[2][i][1] = min + count - 1
             min += count
-#        t2.stop()
-#        range_fh.write("%d\t%s\t%s\n" % ((range[1] - range[0]) + 1, t1, t2))
-#        range_fh.flush()
     return ranges
 
 
+def get_column(matrix, i):
+    return [row[i] for row in matrix]
+
+
+#@clockit
+#def create_abund_pool(r, gap, num_states):
+#    pool = mp.Pool()
+#    results = []
+#    results.append(pool.apply_async(get_abundance_ranges, (r, gap, num_states)))
+#    pool.close()
+#    pool.join()
+#    abund_pool = []
+#    for r in results:
+#        abund_pool.append(r.get())
+#    return abund_pool
+
+
 @clockit
-def run_simulation(r, taxa_tree, num_cols, run, out_file, dist_file):
+def create_abund_pool_from_states(r, data):
+    data2 = numpy.ndarray(data.shape)
+    for i in xrange(len(data)):
+        for j in xrange(len(data[i])):
+            data2[i][j] = data[i][j] - 1
+    abund_pool = list()
+    abund_pool.append(get_abundance_ranges(r, data2, num_states))
+    return abund_pool, data2
+
+#    for i in xrange(len(data)):
+#        for j in xrange(len(data[i])):
+#            data2[i][j] = data[i][j] - 1
+#    pool = mp.Pool()
+#    results = list()
+#    results.append(pool.apply_async(get_abundance_ranges, (r, data2, num_states)))
+#    pool.close()
+#    pool.join()
+#    abund_pool = []
+#    for r in results:
+#        abund_pool.append(r.get())
+#    return abund_pool, data2
+
+
+def run_mr_bayes(tree_num, i, disc, sample_names, orig_tree, filedata):
+    mb_tree = app.run_mrbayes(str(tree_num) + "-" + str(i), disc,
+                              sample_names, disc.ncol,
+                              n_gen, mpi,
+                              mb, procs,
+                              None, filedata['run_dir'],
+                              len(sample_names), "d", filedata['hostfile'])
+    diffs = app.calculate_differences_r(orig_tree, mb_tree)
+    return mb_tree, diffs
+
+
+def is_float(num):
+    try:
+        float(num)
+        return True
+    except ValueError:
+        return False
+
+@clockit
+def run_simulation(r, taxa_tree, sample_tree, tree_num, num_cols, out_file, dist_file, abundance_from_states, filedata, brlen):
     assert isinstance(taxa_tree, dendropy.Tree)
-    r('tree = rtree(%d)' % num_taxa)
+    r('temp=rtree(%d, rooted=F)' % num_taxa)
+    r('edges = runif(length(temp$edge.length), min=0.1)')
+    r('tree=read.tree(text="%s")' % sample_tree)
+    r('tree$edge.length=edges')
+    if is_float(brlen):
+        r('tree$edge.length = rep(%f, length(tree$edge.length))' % brlen)
+
     tree = app.ape_to_dendropy(r['tree'])
+    print tree
     store_valid_matrix_data(r, taxa_tree, num_cols, num_states)
     data = numpy.asarray(r['data'])
     roots = list(r['roots'])
     sample_names = numpy.asarray(r('rownames(data)'))
-    print_sample_trees(r, tree, num_taxa, num_cols, run)
-    print_state_distribution(data, num_cols, run, sample_names, dist_file)
-    ranges = get_column_ranges(data)
-    data, ranges = curate_data_matrix(r, data, ranges)
-    gap = app.restandardize_matrix(data, ranges, num_states)
-    abund_ranges = get_abundance_ranges(r, gap, num_states)
-    #    abund_ranges = app.get_range_from_gamma(num_cols * bits, bits, gamma_shape, gamma_scale, app.compute_smallest_max(),
-    #                                            accept_cols = True)
+    print_sample_trees(r, tree, num_taxa, num_cols, tree_num, filedata)
+    print_state_distribution(data, num_cols, tree_num, sample_names, dist_file)
+    gap = None
+    if not abundance_from_states:
+        ranges = get_column_ranges(data)
+        data, ranges = curate_data_matrix(r, data, ranges)
+        gap = app.restandardize_matrix(data, ranges, num_states)
+
+    abund_pool, gap = create_abund_pool_from_states(r, data)
+
+    abund_ranges = abund_pool[0]
 
     abund = app.get_abundance_matrix(gap, abund_ranges, "gamma", num_states)
-    print_matrices(data, gap, abund, abund_ranges, num_cols, run, sample_names, roots)
     (u_matrix, u_names), (w_matrix, w_names) = app.calculate_unifrac(abund, sample_names, taxa_tree)
 
     # unifrac tests
@@ -339,18 +380,13 @@ def run_simulation(r, taxa_tree, num_cols, run, out_file, dist_file):
     bc_cluster_tree, bc_cluster_diffs = get_bc_cluster(tree, abund, sample_names)
     bc_nj_tree, bc_nj_diffs = get_bc_nj(tree, abund, sample_names)
 
-    # mrbayes
-    disc = app.get_discrete_matrix_from_standardized(gap, bits, sample_names)
-    mb_tree = app.run_mrbayes(run, disc,
-                              sample_names, disc.ncol,
-                              n_gen, mpi,
-                              mb, procs,
-                              None, run_dir,
-                              len(sample_names), "d")
-    mb_diffs = app.calculate_differences_r(tree, mb_tree)
+    new_ranges = get_column_ranges(numpy.array(abund))
+    gap_from_abund = app.restandardize_matrix(abund, new_ranges, num_states)
+    disc = app.get_discrete_matrix_from_standardized(gap_from_abund, bits, sample_names)
+    mb_tree, mb_diffs = run_mr_bayes(tree_num, 0, disc, sample_names, tree, filedata)
 
     # output
-    out_file.write("%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (run, num_cols,
+    out_file.write("%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (tree_num, num_cols,
                                                                          get_tab_string(mb_diffs),
                                                                          get_tab_string(u_pcoa_diffs),
                                                                          get_tab_string(u_cluster_diffs),
@@ -362,14 +398,14 @@ def run_simulation(r, taxa_tree, num_cols, run, out_file, dist_file):
                                                                          get_tab_string(bc_cluster_diffs),
                                                                          get_tab_string(bc_nj_diffs)))
     out_file.flush()
+    print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, num_cols, tree_num, sample_names, roots, 0, filedata)
 
-
-def print_taxa_tree(tree, num_cols):
+def print_taxa_tree(tree, num_cols, filedata):
     assert isinstance(tree, dendropy.Tree)
     r = robjects.r
     r("temp = read.tree(text='%s;')" % tree.as_newick_string())
-    pdf_file = os.path.join(log_dir, "taxa_tree_%d.pdf" % num_cols)
-    text_file = os.path.join(log_dir, "taxa_tree_%d.txt" % num_cols)
+    pdf_file = os.path.join(filedata['log_dir'], "taxa_tree_%d.pdf" % num_cols)
+    text_file = os.path.join(filedata['log_dir'], "taxa_tree_%d.txt" % num_cols)
     r("pdf(file='%s')" % pdf_file)
     r("plot(temp, root.edge=T)")
     r('dev.off()')
@@ -380,7 +416,7 @@ def print_taxa_tree(tree, num_cols):
 
 
 def get_header():
-    return "run\tcols\t"\
+    return "tree_num\tcols\t"\
            "mb_topo\tmb_sym\tmb_path\t"\
            "u_pcoa_topo\tu_pcoa_symm\tu_pcoa_path\t"\
            "u_cluster_topo\tu_cluster_symm\tu_cluster_path\t"\
@@ -393,23 +429,92 @@ def get_header():
            "bc_nj_topo\tbc_nj_symm\tbc_nj_path"
 
 
+def get_args():
+    p = argparse.ArgumentParser()
+    p.add_argument("--tree_file", help = "tree file, one newick per line")
+    p.add_argument("--cols", help = "cols in the matrix", type = int)
+    p.add_argument("--run", help="run id (0-9 for 10 runs)")
+    p.add_argument("--brlen", help="branch lengths for sample tree", default=0.5)
+    p.add_argument("--project_dir", help="root dir for the project", default="../asmw8")
+
+    args = p.parse_args()
+
+    if not args.tree_file or not len(sys.argv) > 1:
+        p.print_help()
+        exit()
+
+    args.abundance_from_states = True
+    return args
+
+
+def get_trees(tree_file, out_dir):
+    trees = []
+    for line in open(tree_file):
+        trees.append(line.rstrip())
+
+    file = os.path.join(out_dir, "trees.txt")
+#    print trees[0]
+#    random.shuffle(trees)
+#    with open(file, "w") as f:
+#        for tree in trees:
+#            f.write("%s\n" % tree)
+    return trees
+
+
+def create_file_data(args):
+    data = dict()
+    data['description'] = ["%d-%d-%d-%.1f-%s" % (num_taxa, bits, num_states, rate, args.brlen),
+                           "%d samples, %d bit encoding, %d states, rate=%.2f, brlen=%s" % (
+                           num_taxa, bits, num_states, rate, args.brlen)]
+    data['run_dir_name'] = datetime.datetime.now().strftime("%m%d%y_%H%M%S")
+    data['run_dir_name'] = str(args.cols) + "-" + str(args.run)
+    data['result_dir'] = app.create_dir(os.path.join(args.project_dir, "results"))
+    data['run_dir'] = app.create_dir(os.path.join(data['result_dir'], data['run_dir_name']))
+    data['out_dir'] = app.create_dir(os.path.join(data['run_dir'], "out"))
+    data['log_dir'] = app.create_dir(os.path.join(data['run_dir'], "log"))
+    data['log_file'] = open(os.path.join(data['log_dir'], "log.txt"), "w")
+    app.log_file = data['log_file']
+
+    data['desc'] = open(os.path.join(data['run_dir'], "readme.txt"), "w")
+    with data['desc']:
+        data['desc'].write("%s\n" % data['description'][1])
+
+    data['range_fh'] = open(os.path.join(data['log_dir'], "range_time.txt"), "w")
+    data['hostfile'] = None
+
+    if os.path.isfile("hostfile"):
+        data['hostfile'] = os.path.abspath("hostfile")
+    return data
+
+
 @clockit
 def main():
+    args = get_args()
     r = create_R()
-    out_file = open(os.path.join(out_dir, "out.txt"), "w")
+    filedata = create_file_data(args)
+    sample_trees = get_trees(args.tree_file, filedata['out_dir'])
+    out_file = open(os.path.join(filedata['out_dir'], "out.txt"), "w")
     out_file.write("%s\n" % get_header())
-    dist_file = open(os.path.join(out_dir, "dists.txt"), "w")
-    for col in cols:
-        tree = app.create_tree(col, "T")
-        print_taxa_tree(tree, col)
-        for run in xrange(runs):
-            run_simulation(r, tree, col, run, out_file, dist_file)
+    dist_file = open(os.path.join(filedata['out_dir'], "dists.txt"), "w")
+    col = args.cols
+    taxa_tree = app.create_tree(col, "T")
+    print_taxa_tree(taxa_tree, col, filedata)
+    for tree_num, sample_tree in enumerate(sample_trees):
+        try:
+            run_simulation(r, taxa_tree, sample_tree, tree_num, col, out_file, dist_file, args.abundance_from_states,
+                       filedata, args.brlen)
+        except:
+            traceback.print_exc()
+            pass
+
+#        if tree_num > 19:
+#            break
     out_file.close()
     dist_file.close()
+    filedata['range_fh'].close()
 
 if __name__ == '__main__':
     main()
-    range_fh.close()
     print "Done!"
 
 

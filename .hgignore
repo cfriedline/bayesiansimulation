@@ -2,3 +2,7 @@
 .counts
 .pyc
 .txt
+.nex
+.sh
+conflicted
+.newick

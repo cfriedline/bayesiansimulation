@@ -360,7 +360,7 @@ def _generate_candidate_triplet_discrete_matrix(num_cols, num_samples, sample_tr
 
 
 @clockit
-def create_discrete_matrix(num_cols, num_samples, sample_tree, bits):
+def create_discrete_matrix(num_cols, num_samples, sample_tree, bits, accept_cols = False):
     """
     Creates a discrete char matrix from a tree
     @param num_cols: number of columns to create
@@ -369,7 +369,9 @@ def create_discrete_matrix(num_cols, num_samples, sample_tree, bits):
     @rtype: tuple(robjects.Matrix, list)
     """
     r = robjects.r
-    usable_cols = find_usable_length(num_cols, bits)
+    usable_cols = num_cols
+    if not accept_cols:
+        usable_cols = find_usable_length(num_cols, bits)
     a, n = _generate_candidate_triplet_discrete_matrix(num_cols, num_samples, sample_tree, bits, usable_cols)
     b, m = _generate_candiate_free_discrete_matrix(sample_tree, usable_cols)
 
@@ -436,19 +438,25 @@ def find_usable_length(num_cols, bits):
     return max([x for x in range(num_cols + 1) if x % bits ** 2 == 0])
 
 
+@clockit
 def _append_gap_ranges(data, states):
+    # pre-populate to avoid finding later, with [-1, -1]
+    for range in data:
+        for i in xrange(states):
+            range[2].append([-1] * 2)
+
     for range in data:
         d = range[2]
         for i in xrange(int(range[0]), int(range[1]) + 1):
             weight = int(compute_weight(states, i, range[1], range[0]))
-            if weight in d:
-                d[weight][1] = i
+            if d[weight][0] == -1:
+                d[weight][0] = i
             else:
-                d[weight] = [None] * 2
-                d[weight][0]= i
+                d[weight][1] = i
 
 
-def get_range_from_gamma(num_cols, bits, gamma_shape, gamma_scale, smallest_max):
+@clockit
+def get_range_from_gamma(num_cols, bits, gamma_shape, gamma_scale, smallest_max, accept_cols = False):
     """
     gets a range of random column totals from a gamma distribution
     of given shape and scale
@@ -460,15 +468,20 @@ def get_range_from_gamma(num_cols, bits, gamma_shape, gamma_scale, smallest_max)
     @rtype: numpy.ndarray
     """
     data = []
-    for x in xrange(0, find_usable_length(num_cols, bits) / bits):
+    cols = num_cols
+    if not accept_cols:
+        cols = find_usable_length(num_cols, bits) / bits
+    for x in xrange(0, cols):
         nums = get_random_min_and_max_from_gamma(gamma_shape, gamma_scale, smallest_max)
         data.append(nums)
     states = int("1" * bits, 2) + 1
     _append_gap_ranges(data, states)
-    return numpy.array(data)
+    return data
 
+#    return numpy.array(data)
 
-def get_range_from_normal(num_cols, bits, mean, sd, smallest_max):
+@clockit
+def get_range_from_normal(num_cols, bits, mean, sd, smallest_max, accept_cols = False):
     """
     gets a range of random column totals from a normal distribution
     of given shape and scale
@@ -481,7 +494,9 @@ def get_range_from_normal(num_cols, bits, mean, sd, smallest_max):
     @rtype: numpy.ndarray
     """
     data = []
-    for x in xrange(0, find_usable_length(num_cols, bits) / bits):
+    if not accept_cols:
+        cols = find_usable_length(num_cols, bits) / bits
+    for x in xrange(0, cols):
         nums = get_random_min_and_max_from_normal(mean, sd, smallest_max)
         data.append(nums)
     states = int("1" * bits, 2) + 1
@@ -489,7 +504,7 @@ def get_range_from_normal(num_cols, bits, mean, sd, smallest_max):
     return numpy.array(data)
 
 
-def get_random_min_and_max_from_normal(mean, sd, smallest_max):
+def get_random_min_and_max_from_normal(mean, sd, min):
     """
     Gets random min and max from a normal distrubiton
     @param mean: desired mean
@@ -498,10 +513,10 @@ def get_random_min_and_max_from_normal(mean, sd, smallest_max):
     @rtype: tuple
     """
     max = get_random_from_normal(mean, sd)
-    while max < smallest_max:
+    while max < min:
         max = get_random_from_normal(mean, sd)
-    smallest_max = round(numpy.random.uniform(low = 0.0, high = max / 8.0))
-    return smallest_max, max, {}
+    min = round(numpy.random.uniform(low = 0.0, high = max / 8.0))
+    return [min, max, []]
 
 
 def get_random_min_and_max_from_gamma(gamma_shape, gamma_scale, min):
@@ -516,7 +531,7 @@ def get_random_min_and_max_from_gamma(gamma_shape, gamma_scale, min):
     while max < min:
         max = get_random_from_gamma(gamma_shape, gamma_scale)
     min = round(numpy.random.uniform(low = 0.0, high = max / 8.0))
-    return min, max, {}
+    return [min, max, []]
 
 
 def get_random_from_normal(mean, sd):
@@ -572,10 +587,8 @@ def compute_weight(num_states, abund, max, min):
     @return: the gap weight
     @rtype: int
     """
-    w = round((num_states * (abund - min)) / (max - min))
-    if w == num_states:
-        w = num_states - 1
-    return w
+    w = round(((float(abund) - min) * (num_states - 1)) / (max - min))
+    return int(w)
 
 
 def find_range_limit(weight, abund, max, min, limit, num_states):
@@ -640,7 +653,7 @@ def get_random_abundance(weight, col_range):
     @return: the abundance
     @rypte: int
     """
-    r = col_range[2][weight]
+    r = col_range[2][int(weight)]
     rand = numpy.random.uniform(low = r[0], high = r[1])
     return round(rand)
 
@@ -659,12 +672,12 @@ def get_abundance_matrix(gap, ranges, dist, num_states):
     """
     print "Getting %s abundance matrix" % dist
     data = []
-    col_min = [False] * len(gap[0])
-    col_max = [False] * len(gap[0])
+    col_min = [False] * len(gap[0]) # stores whether min has been found for a col
+    col_max = [False] * len(gap[0]) # stores whether max has been found for a col
+
     for i, row in enumerate(gap):
         data.append([None] * len(col_min))
         for j, weight in enumerate(row):
-#            abund = round(((weight * (ranges[j][1] - ranges[j][0])) / num_states) + ranges[j][0])
             if weight == 0.0:
                 if col_min[j] is False:
                     data[i][j] = ranges[j][0]
