@@ -13,9 +13,7 @@ from rpy2.robjects import numpy2ri
 from app import clockit
 import dendropy
 import sys
-import multiprocessing as mp
 import argparse
-import random
 
 numpy2ri.activate()
 sys.setrecursionlimit(1000000)
@@ -23,7 +21,7 @@ sys.setrecursionlimit(1000000)
 hostname = os.uname()[1]
 project_dir = "/Users/chris/projects/asmw4"
 n_gen = 100000
-mpi = "/opt/local/bin/mpirun"
+mpi = "/opt/local/bin/openmpirun"
 mb_old = "/Users/chris/src/mrbayes-3.1.2/mb"
 mb_new = "/Users/chris/src/mrbayes_3.2.1/src/mb"
 mb = mb_old
@@ -280,20 +278,7 @@ def get_column(matrix, i):
     return [row[i] for row in matrix]
 
 
-#@clockit
-#def create_abund_pool(r, gap, num_states):
-#    pool = mp.Pool()
-#    results = []
-#    results.append(pool.apply_async(get_abundance_ranges, (r, gap, num_states)))
-#    pool.close()
-#    pool.join()
-#    abund_pool = []
-#    for r in results:
-#        abund_pool.append(r.get())
-#    return abund_pool
-
-
-@clockit
+clockit
 def create_abund_pool_from_states(r, data):
     data2 = numpy.ndarray(data.shape)
     for i in xrange(len(data)):
@@ -302,20 +287,6 @@ def create_abund_pool_from_states(r, data):
     abund_pool = list()
     abund_pool.append(get_abundance_ranges(r, data2, num_states))
     return abund_pool, data2
-
-#    for i in xrange(len(data)):
-#        for j in xrange(len(data[i])):
-#            data2[i][j] = data[i][j] - 1
-#    pool = mp.Pool()
-#    results = list()
-#    results.append(pool.apply_async(get_abundance_ranges, (r, data2, num_states)))
-#    pool.close()
-#    pool.join()
-#    abund_pool = []
-#    for r in results:
-#        abund_pool.append(r.get())
-#    return abund_pool, data2
-
 
 def run_mr_bayes(tree_num, i, disc, sample_names, orig_tree, filedata):
     mb_tree = app.run_mrbayes(str(tree_num) + "-" + str(i), disc,
@@ -451,13 +422,7 @@ def get_trees(tree_file, out_dir):
     trees = []
     for line in open(tree_file):
         trees.append(line.rstrip())
-
     file = os.path.join(out_dir, "trees.txt")
-#    print trees[0]
-#    random.shuffle(trees)
-#    with open(file, "w") as f:
-#        for tree in trees:
-#            f.write("%s\n" % tree)
     return trees
 
 
@@ -500,15 +465,8 @@ def main():
     taxa_tree = app.create_tree(col, "T")
     print_taxa_tree(taxa_tree, col, filedata)
     for tree_num, sample_tree in enumerate(sample_trees):
-        try:
-            run_simulation(r, taxa_tree, sample_tree, tree_num, col, out_file, dist_file, args.abundance_from_states,
+        run_simulation(r, taxa_tree, sample_tree, tree_num, col, out_file, dist_file, args.abundance_from_states,
                        filedata, args.brlen)
-        except:
-            traceback.print_exc()
-            pass
-
-#        if tree_num > 19:
-#            break
     out_file.close()
     dist_file.close()
     filedata['range_fh'].close()

@@ -161,8 +161,10 @@ def create_dir(dir):
     @return: the path
     @rtype: string
     """
-    if not os.path.exists(dir):
+    try:
         os.makedirs(dir)
+    except OSError:
+        pass
     return dir
 
 
@@ -794,7 +796,7 @@ def output_matrix(data, folder, file_name, is_r):
     writes a matrix out to a file
     @param data: the matrix to write
     @param folder: the folder
-    @param file_name: the filename
+    @param file_name: the filenamer
     @param is_r: whether the matrix is from rpy2
     """
     with open(os.path.join(folder, file_name), 'w') as f:
@@ -828,6 +830,7 @@ def create_mrbayes_file(file, matrix, sample_names, num_cols, n_gen):
     file.write("set autoclose=yes nowarn=yes;\n")
     file.write("lset rates=equal coding=all;\n")
     #file.write("mcmcp checkpoint=yes;\n")
+    file.write("mcmcp stoprule=YES stopval=0.01 minpartfreq=0.05;\n")
     file.write("mcmc ngen=%d;\n" % n_gen)
     file.write("sump;\n")
     file.write("sumt;\n")
@@ -836,7 +839,8 @@ def create_mrbayes_file(file, matrix, sample_names, num_cols, n_gen):
 
 
 @clockit
-def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, out_dir, num_samples, name_flag):
+def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, out_dir, num_samples, name_flag,
+                hostfile):
     """
     Function to run mrbayes and return a tree
     @param i: run iteration
@@ -859,9 +863,23 @@ def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, 
     mb_dir = os.path.join(out_dir, "mb")
     if not os.path.exists(mb_dir):
         os.mkdir(mb_dir)
-    mb_file = os.path.join(mb_dir, "mb_%d_%d_%s_%d_%s.nex" % (num_samples, matrix.ncol, dist_name, i, name_flag))
+    mb_file = os.path.join(mb_dir, "mb_%d_%d_%s_%s_%s.nex" % (num_samples, matrix.ncol, dist_name, i, name_flag))
     create_mrbayes_file(open(mb_file, "w"), matrix, sample_names, matrix.ncol, n_gen)
-    cmd = [mpi, "-np", procs, mb, os.path.abspath(mb_file)]
+    cmd = [mpi, "-mca", "pml", "ob1", "-mca", "btl", "self,tcp",
+           "-np", procs, mb, os.path.abspath(mb_file)]
+    temp_file = None
+    if hostfile:
+        hosts = []
+        for line in open(hostfile):
+            hosts.append(line.rstrip())
+        random.shuffle(hosts)
+        temp_file = tempfile.NamedTemporaryFile(delete = False)
+        with temp_file:
+            for host in hosts:
+                temp_file.write("%s\n" % host)
+        cmd = [mpi, "-mca", "pml", "ob1", "-mca", "btl", "self,tcp",
+               "-np", procs, "--hostfile", temp_file.name, mb, os.path.abspath(mb_file)]
+
     cmd_string = " ".join([str(elem) for elem in cmd])
     print cmd_string
     p = Popen(cmd_string, shell = True, stdin = PIPE, stdout = PIPE, stderr = STDOUT, close_fds = True)
@@ -873,11 +891,16 @@ def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, 
     if not os.path.exists(mbresult):
         mbresult = os.path.abspath(mb_file) + ".con"
 
+    if not os.path.exists(mbresult):
+        "can't get %s, restarting run" % mbresult
+
     tree = dendropy.Tree.get_from_path(mbresult, "nexus")
     assert isinstance(tree, dendropy.Tree)
     tree = make_tree_binary(tree.as_newick_string())
     assert isinstance(tree, dendropy.Tree)
     tree.is_rooted = False
+    if temp_file:
+        os.unlink(temp_file.name)
     return tree
 
 
