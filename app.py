@@ -883,9 +883,9 @@ def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, 
     cmd_string = " ".join([str(elem) for elem in cmd])
     print cmd_string
     p = Popen(cmd_string, shell = True, stdin = PIPE, stdout = PIPE, stderr = STDOUT, close_fds = True)
-    #    p.communicate()
-    for line in iter(p.stdout.readline, ''):
-        print line.rstrip()
+    p.communicate()
+#    for line in iter(p.stdout.readline, ''):
+#        print line.rstrip()
     mbresult = os.path.abspath(mb_file) + ".con.tre"
 
     if not os.path.exists(mbresult):
