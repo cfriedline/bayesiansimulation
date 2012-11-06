@@ -19,6 +19,7 @@ import math
 import stopwatch
 import multiprocessing as mp
 from multiprocessing import Pool, current_process, Manager
+from threading import Timer, Thread, Event, _Timer
 
 #mp_logger = mp.log_to_stderr()
 #mp_logger.setLevel(mp.SUBDEBUG)
@@ -827,6 +828,7 @@ def create_mrbayes_file(file, matrix, sample_names, num_cols, n_gen):
     file.write("END;\n\n")
 
     file.write("begin mrbayes;\n")
+    file.write("log start filename=mb.log append;\n")
     file.write("set autoclose=yes nowarn=yes;\n")
     file.write("lset rates=equal coding=all;\n")
     #file.write("mcmcp checkpoint=yes;\n")
@@ -883,9 +885,22 @@ def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, 
     cmd_string = " ".join([str(elem) for elem in cmd])
     print cmd_string
     p = Popen(cmd_string, shell = True, stdin = PIPE, stdout = PIPE, stderr = STDOUT, close_fds = True)
-    p.communicate()
+    kill_proc = lambda p: p.kill()
+    timer = Timer(600, kill_proc, [p])
+    timer.start()
+    stdout, stderr = p.communicate()
+
+    if p.returncode != 0:
+        print "MrBayes timeout, killing!"
+        timer.cancel()
+        return run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, out_dir, num_samples, name_flag,
+            hostfile)
+
+    timer.cancel()
+
 #    for line in iter(p.stdout.readline, ''):
 #        print line.rstrip()
+#
     mbresult = os.path.abspath(mb_file) + ".con.tre"
 
     if not os.path.exists(mbresult):
@@ -1232,5 +1247,4 @@ def correlate_matrices(matrix1, matrix2):
         [m1.append(elem) for elem in matrix1.rx(i + 1, True)]
         [m2.append(elem) for elem in matrix2.rx(i + 1, True)]
     return stats.pearsonr(numpy.asarray(m1), numpy.asarray(m2))
-
 
