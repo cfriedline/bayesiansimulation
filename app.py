@@ -3,6 +3,7 @@ import random
 import string
 import traceback
 import rpy2.rinterface as rinterface
+import sys
 
 rinterface.set_initoptions(('rpy2', '--vanilla', '--max-ppsize=500000', '--quiet'))
 
@@ -828,7 +829,7 @@ def create_mrbayes_file(file, matrix, sample_names, num_cols, n_gen):
     file.write("END;\n\n")
 
     file.write("begin mrbayes;\n")
-    file.write("log start filename=mb.log append;\n")
+    file.write("log start filename=%s replace;\n" % os.path.join(os.path.dirname(file.name), "mb.log"))
     file.write("set autoclose=yes nowarn=yes;\n")
     file.write("lset rates=equal coding=all;\n")
     #file.write("mcmcp checkpoint=yes;\n")
@@ -842,7 +843,7 @@ def create_mrbayes_file(file, matrix, sample_names, num_cols, n_gen):
 
 @clockit
 def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, out_dir, num_samples, name_flag,
-                hostfile):
+                hostfile, timeout):
     """
     Function to run mrbayes and return a tree
     @param i: run iteration
@@ -866,6 +867,7 @@ def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, 
     if not os.path.exists(mb_dir):
         os.mkdir(mb_dir)
     mb_file = os.path.join(mb_dir, "mb_%d_%d_%s_%s_%s.nex" % (num_samples, matrix.ncol, dist_name, i, name_flag))
+
     create_mrbayes_file(open(mb_file, "w"), matrix, sample_names, matrix.ncol, n_gen)
     cmd = [mpi, "-mca", "pml", "ob1", "-mca", "btl", "self,tcp",
            "-np", procs, mb, os.path.abspath(mb_file)]
@@ -885,18 +887,23 @@ def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, 
     cmd_string = " ".join([str(elem) for elem in cmd])
     print cmd_string
     p = Popen(cmd_string, shell = True, stdin = PIPE, stdout = PIPE, stderr = STDOUT, close_fds = True)
-    kill_proc = lambda p: p.kill()
-    timer = Timer(600, kill_proc, [p])
-    timer.start()
+    timer = None
+    if timeout:
+        kill_proc = lambda p: p.kill()
+        timer = Timer(timeout, kill_proc, [p])
+        timer.start()
+
     stdout, stderr = p.communicate()
 
     if p.returncode != 0:
         print "MrBayes timeout, killing!"
-        timer.cancel()
+        if timeout:
+            timer.cancel()
         return run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, out_dir, num_samples, name_flag,
             hostfile)
 
-    timer.cancel()
+    if timeout:
+        timer.cancel()
 
 #    for line in iter(p.stdout.readline, ''):
 #        print line.rstrip()

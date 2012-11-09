@@ -276,7 +276,7 @@ def get_column(matrix, i):
     return [row[i] for row in matrix]
 
 
-clockit
+
 
 def create_abund_pool_from_states(r, data):
     data2 = numpy.ndarray(data.shape)
@@ -288,13 +288,13 @@ def create_abund_pool_from_states(r, data):
     return abund_pool, data2
 
 
-def run_mr_bayes(tree_num, i, disc, sample_names, orig_tree, filedata):
+def run_mr_bayes(tree_num, i, disc, sample_names, orig_tree, filedata, mrbayes_timeout):
     mb_tree = app.run_mrbayes(str(tree_num) + "-" + str(i), disc,
         sample_names, disc.ncol,
         n_gen, mpi,
         mb, procs,
         None, filedata['run_dir'],
-        len(sample_names), "d", filedata['hostfile'])
+        len(sample_names), "d", filedata['hostfile'], mrbayes_timeout)
     diffs = app.calculate_differences_r(orig_tree, mb_tree)
     return mb_tree, diffs
 
@@ -309,14 +309,14 @@ def is_float(num):
 
 @clockit
 def run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols, out_file, dist_file,
-                   abundance_from_states, filedata, brlen):
+                   abundance_from_states, filedata, brlen, mrbayes_timeout):
     assert isinstance(taxa_tree, dendropy.Tree)
     r('temp=rtree(%d, rooted=F)' % num_taxa)
     r('edges = runif(length(temp$edge.length), min=0.1)')
     r('tree=read.tree(text="%s")' % sample_tree)
     r('tree$edge.length=edges')
     if is_float(brlen):
-        r('tree$edge.length = rep(%f, length(tree$edge.length))' % brlen)
+        r('tree$edge.length = rep(%f, length(tree$edge.length))' % float(brlen))
 
     tree = app.ape_to_dendropy(r['tree'])
     print tree
@@ -367,7 +367,7 @@ def run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_c
     new_ranges = get_column_ranges(numpy.array(abund))
     gap_from_abund = app.restandardize_matrix(abund, new_ranges, num_states)
     disc = app.get_discrete_matrix_from_standardized(gap_from_abund, bits, sample_names)
-    mb_tree, mb_diffs = run_mr_bayes(tree_num, 0, disc, sample_names, tree, filedata)
+    mb_tree, mb_diffs = run_mr_bayes(tree_num, 0, disc, sample_names, tree, filedata, mrbayes_timeout)
 
     # output
     try:
@@ -441,6 +441,7 @@ def get_args():
     p.add_argument("--run", help="run id (0-9 for 10 runs)")
     p.add_argument("--brlen", help="branch lengths for sample tree", default=0.5)
     p.add_argument("--project_dir", help="root dir for the project", default="../asmw8")
+    p.add_argument('--mrbayes_timeout', help="timeout for mrbayes instance", type=float)
 
     args = p.parse_args()
 
@@ -513,7 +514,7 @@ def main():
     for tree_num, sample_tree in enumerate(sample_trees):
         run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, out_file, dist_file,
             args.abundance_from_states,
-            filedata, args.brlen)
+            filedata, args.brlen, args.mrbayes_timeout)
     out_file.close()
     dist_file.close()
     filedata['range_fh'].close()

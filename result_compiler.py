@@ -1,4 +1,5 @@
 import traceback
+import datetime
 
 __author__ = 'chris'
 
@@ -59,7 +60,6 @@ def group_out_files(files):
 
         for line in fh:
             group[cols].append(line.rstrip())
-
     return group
 
 
@@ -113,8 +113,10 @@ def summarize_groups(dir, group_files):
     dirname = os.path.basename(dir)
     env_key = os.path.basename(dir)[-1]
     env = {"4": "brlen=0.5", "5":"brlen = U(0.0, 1.0)", "6":"brlen=U(0.0, 1.0)", "7":"brlen=U(0.1, 1.0)", "8":"brlen=0.5"}
+    total_sims = 0
     for file in group_files:
         data = get_file_data(file)
+        total_sims += len(data)
         trees = get_column(data, 0)
         print file[:-4], len(set(trees))
         f = open(file)
@@ -123,7 +125,7 @@ def summarize_groups(dir, group_files):
         rownames = []
         matrix = []
         for i, elem in enumerate(header):
-            if '_sym' in elem:
+            if '_symm' in elem:
                 row = []
                 matrix.append(row)
                 rownames.append(elem)
@@ -155,6 +157,8 @@ def summarize_groups(dir, group_files):
         except:
             traceback.print_exc()
             print "Error with %s" % file
+
+    print "total sims = %d (%.2f%%)" % (total_sims, float(total_sims*100)/(10395*4*10))
 
 
 def compute_diff_for_trees(out_files):
@@ -189,13 +193,25 @@ def compute_diff_for_trees(out_files):
         r("plot(data$max, data$mb_path_diff, xlab='Maximum branch length', ylab='Bayesian symmetric difference', xlim=c(0,1))")
         r("dev.off()")
 
+def modification_date(filename):
+    m = os.path.getmtime(filename)
+    return datetime.datetime.fromtimestamp(m)
 
+def compute_mod_time(out_files):
+    secs = []
+    now = datetime.datetime.now()
+    for file in out_files:
+        s = (now - modification_date(file)).total_seconds()
+        secs.append(s)
+    secs.sort()
+    return secs
 
 
 def main():
     robjects.r("library(ape)")
     args = get_args()
     out_files = get_out_files(args.dir)
+    file_mods = compute_mod_time(out_files)
     out_groups = group_out_files(out_files)
     group_files = []
     for k in out_groups:
@@ -203,6 +219,9 @@ def main():
     group_files.sort()
 #    compute_diff_for_trees(out_files)
     summarize_groups(args.dir, group_files)
+
+    oldest_mod_time = divmod(file_mods[-1], 60)
+    print "oldest file is %d mins and %.2f secs old" % (int(oldest_mod_time[0]), oldest_mod_time[1])
 
 
 if __name__ == '__main__':

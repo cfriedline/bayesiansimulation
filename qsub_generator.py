@@ -2,6 +2,8 @@ __author__ = 'chris'
 import subprocess
 import re
 import os
+import argparse
+import sys
 
 
 def find_good_servers():
@@ -15,16 +17,37 @@ def find_good_servers():
                 d.append(data[0])
     return d
 
-def write_file(prefix, col, run):
+def write_file(prefix, col, run, args):
     name = None
     with open("%s_%d_%d.sh" % (prefix, col, run), "w") as f:
         name = f.name
         f.write("#!/bin/bash\n")
 #        f.write("export PSM_SHAREDCONTEXTS_MAX=8\n")
-        f.write("p runsimulation4.py --tree_file 8_taxa.newick_shuffled.txt --cols %d --run %d\n" % (col, run))
+        f.write("p runsimulation4.py --tree_file 8_taxa.newick_shuffled.txt --cols %d --run %d --brlen %s --project_dir %s --mrbayes_timeout %f\n" % (col, run, args.brlen, args.project_dir, args.mrbayes_timeout))
     return name
 
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--brlen', default="0.5")
+    parser.add_argument('--project_dir')
+    parser.add_argument('--mrbayes_timeout', default=600, type=float)
+
+    if not len(sys.argv) > 1:
+        parser.print_help()
+        sys.exit()
+
+    args = parser.parse_args()
+
+    if not args.project_dir:
+        print "Must have project_dir"
+        parser.print_help()
+        sys.exit()
+
+    return args
+
+
 def main():
+    args = get_args()
     servers = find_good_servers()
     with open("hostfile", "w") as f:
         for server in servers:
@@ -38,8 +61,8 @@ def main():
         cols = [1000, 3000, 6000, 9000]
         for col in cols:
             for run in xrange(10):
-                script = write_file("sim", col, run)
-                cmd = "qsub -V -N bayessim -cwd -j y -q %s %s" % (queue_string,  script)
+                script = write_file("sim", col, run, args)
+                cmd = "qsub -V -N %s-%d-%d -cwd -j y -q %s %s" % (os.path.basename(args.project_dir),col, run, queue_string,  script)
                 f.write("%s\n" % cmd)
 if __name__ == '__main__':
     main()

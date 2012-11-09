@@ -1,3 +1,6 @@
+import argparse
+import sys
+
 __author__ = 'chris'
 import numpy
 from stopwatch import clockit
@@ -9,7 +12,7 @@ import datetime
 hostname = os.uname()[1]
 project_dir = "/Users/chris/projects/bayessim_dacc"
 n_gen = 100000
-mpi = "/opt/local/bin/mpirun"
+mpi = "/opt/local/bin/openmpirun"
 mb = "/Users/chris/src/mrbayes_3.2.1/src/mb"
 procs = 4
 
@@ -35,7 +38,6 @@ log_file = open(os.path.join(log_dir, "log.txt"), "w")
 app.log_file = log_file
 
 
-
 class Sample:
     def __init__(self, data):
         self.name = data[0]
@@ -43,6 +45,7 @@ class Sample:
 
     def __str__(self):
         return "%s (%s)" % (self.name, len(self.otus))
+
 
 @clockit
 def get_samples():
@@ -60,11 +63,13 @@ def get_samples():
         num += 1
     return samples, header[1:]
 
+
 def get_sample_names(samples):
     data = []
     for s in samples:
         data.append(s.name)
     return data
+
 
 @clockit
 def get_otu_data(samples):
@@ -73,12 +78,14 @@ def get_otu_data(samples):
         data.append(sample.otus)
     return numpy.asarray(data)
 
+
 @clockit
 def get_column_ranges(data):
     ranges = []
     for col in data.T:
         ranges.append((min(col), max(col)))
     return ranges
+
 
 def print_gap(gap, header, sample_names):
     out = open("dacc_gap.txt", "w")
@@ -87,7 +94,23 @@ def print_gap(gap, header, sample_names):
         for i, row in enumerate(gap):
             out.write("%s\t%s\n" % (sample_names[i], "\t".join([str(int(elem)) for elem in row])))
 
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--hostfile')
+    parser.add_argument('--mrbayes_timeout', type=float)
+
+    args = parser.parse_args()
+
+    if not len(sys.argv) > 1:
+        parser.print_help()
+        sys.exit()
+
+    return parser.parse_args()
+
+
 def main():
+    args = get_args()
     samples, header = get_samples()
     print "num samples = %d, otus = %d" % (len(samples), len(header))
     sample_names = get_sample_names(samples)
@@ -98,7 +121,8 @@ def main():
     disc = app.get_discrete_matrix_from_standardized(gap, 3, sample_names)
     assert isinstance(disc, robjects.Matrix)
     #run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, out_dir, num_samples, name_flag):
-    app.run_mrbayes(0, disc, sample_names, disc.ncol, n_gen, mpi, mb, procs, None, out_dir, len(sample_names), "dacc")
+    app.run_mrbayes(0, disc, sample_names, disc.ncol, n_gen, mpi, mb, procs, None, out_dir, len(sample_names), "dacc",
+        args.hostfile, args.mrbayes_timeout)
 
 if __name__ == '__main__':
     main()
