@@ -833,7 +833,7 @@ def create_mrbayes_file(file, matrix, sample_names, num_cols, n_gen):
     file.write("set autoclose=yes nowarn=yes;\n")
     file.write("lset rates=equal coding=all;\n")
     #file.write("mcmcp checkpoint=yes;\n")
-    file.write("mcmcp stoprule=YES stopval=0.01 minpartfreq=0.05;\n")
+    file.write("mcmcp stoprule=YES stopval=0.0001 minpartfreq=0.05;\n")
     file.write("mcmc ngen=%d;\n" % n_gen)
     file.write("sump;\n")
     file.write("sumt;\n")
@@ -899,8 +899,7 @@ def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, 
         print "MrBayes timeout, killing!"
         if timeout:
             timer.cancel()
-        return run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, out_dir, num_samples, name_flag,
-            hostfile)
+        return run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, out_dir, num_samples, name_flag, hostfile, timeout)
 
     if timeout:
         timer.cancel()
