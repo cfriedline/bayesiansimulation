@@ -46,20 +46,18 @@ def get_out_files(dir):
 
     return out_files
 
+def add_to_dict_list(d, key, val):
+    if not key in d:
+        d[key] = []
+    d[key].append(val)
 
 def group_out_files(files):
     group = {}
     for file in files:
         cols = os.path.split(os.path.dirname(os.path.dirname(file)))[1].split("-")[0]
         fh = open(file)
-        if not cols in group:
-            group[cols] = []
-            group[cols].append(fh.readline().rstrip())
-        else:
-            fh.readline()
-
         for line in fh:
-            group[cols].append(line.rstrip())
+            add_to_dict_list(group, cols, line.rstrip())
     return group
 
 
@@ -79,9 +77,9 @@ def process_group(cols, data, group_files):
 def get_file_data(file):
     data = []
     with open(file) as f:
-        f.readline() # skip header
         for line in f:
-            data.append([int(i) for i in line.rstrip().split("\t")])
+            if not "tree" in line:
+                data.append([int(i) for i in line.rstrip().split("\t")])
     return numpy.array(data)
 
 
@@ -108,20 +106,37 @@ def get_percent_over_(col_data, dist):
             sum += 1
     return round(float(sum) * 100 / len(col_data), 1)
 
+def collapse_missing(missing):
+    collapsed = {}
+    for k, v in missing.items():
+        cols = k.split("/")[6][0:4]
+        if not cols in collapsed:
+            collapsed[cols] = 0
+        collapsed[cols] += v
+    return collapsed
 
-def summarize_groups(dir, group_files):
+
+def summarize_groups(dir, group_files, missing):
+    for k, v in missing.items():
+        if v > 0:
+            print k, v
+    collapsed_missing = collapse_missing(missing)
     dirname = os.path.basename(dir)
-    env_key = os.path.basename(dir)[-1]
-    env = {"4": "brlen=0.5", "5":"brlen = U(0.0, 1.0)", "6":"brlen=U(0.0, 1.0)", "7":"brlen=U(0.1, 1.0)", "8":"brlen=0.5"}
+    env_key = os.path.basename(dir)
+    env = {"asmw4": "brlen=0.5",
+           "asmw5":"brlen = U(0.0, 1.0)",
+           "asmw6":"brlen=U(0.0, 1.0)",
+           "asmw7":"brlen=U(0.1, 1.0)",
+           "asmw8":"brlen=0.5",
+           "bsim4":"brlen=0.5"}
     total_sims = 0
     for file in group_files:
         data = get_file_data(file)
         total_sims += len(data)
         trees = get_column(data, 0)
-        print file[:-4], len(set(trees))
+        print file[:-4], len(set(trees)), "missing =", collapsed_missing[file[:-4]]
         f = open(file)
         header = f.readline().rstrip().split("\t")
-#        print header
         rownames = []
         matrix = []
         for i, elem in enumerate(header):
@@ -207,18 +222,40 @@ def compute_mod_time(out_files):
     return secs
 
 
+def get_missing(out_files):
+    missing = {}
+    for file in out_files:
+        key = os.path.abspath(file)
+        missing[key] = 0
+        expected = 0
+        total = 10395
+        f = open(file)
+        f.readline() #skip header
+        for line in f:
+            l = line.rstrip().split("\t")
+            num = int(l[0])
+            assert num == expected
+            expected += 1
+        if expected != total:
+            missing[key] = total-expected
+    return missing
+
+def print_missing(missing):
+    for k, v in missing.items():
+        print k, v
+
 def main():
     robjects.r("library(ape)")
     args = get_args()
     out_files = get_out_files(args.dir)
+    missing = get_missing(out_files)
     file_mods = compute_mod_time(out_files)
     out_groups = group_out_files(out_files)
     group_files = []
     for k in out_groups:
         process_group(k, out_groups[k], group_files)
     group_files.sort()
-#    compute_diff_for_trees(out_files)
-    summarize_groups(args.dir, group_files)
+    summarize_groups(args.dir, group_files, missing)
 
     oldest_mod_time = divmod(file_mods[-1], 60)
     print "oldest file is %d mins and %.2f secs old" % (int(oldest_mod_time[0]), oldest_mod_time[1])

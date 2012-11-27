@@ -21,6 +21,7 @@ import stopwatch
 import multiprocessing as mp
 from multiprocessing import Pool, current_process, Manager
 from threading import Timer, Thread, Event, _Timer
+import platform
 
 #mp_logger = mp.log_to_stderr()
 #mp_logger.setLevel(mp.SUBDEBUG)
@@ -833,7 +834,7 @@ def create_mrbayes_file(file, matrix, sample_names, num_cols, n_gen):
     file.write("set autoclose=yes nowarn=yes;\n")
     file.write("lset rates=equal coding=all;\n")
     #file.write("mcmcp checkpoint=yes;\n")
-    file.write("mcmcp stoprule=YES stopval=0.0001 minpartfreq=0.05;\n")
+    file.write("mcmcp stoprule=YES stopval=0.01 minpartfreq=0.05;\n")
     file.write("mcmc ngen=%d;\n" % n_gen)
     file.write("sump;\n")
     file.write("sumt;\n")
@@ -896,7 +897,7 @@ def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, 
     stdout, stderr = p.communicate()
 
     if p.returncode != 0:
-        print "MrBayes timeout, killing!"
+        print "MrBayes timeout, killing on %s!" % platform.uname()[1]
         if timeout:
             timer.cancel()
         return run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, out_dir, num_samples, name_flag, hostfile, timeout)

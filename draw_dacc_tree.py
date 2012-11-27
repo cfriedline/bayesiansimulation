@@ -7,11 +7,12 @@ import Bio
 import pylab
 from ete2 import Tree, TreeStyle, TreeNode, NodeStyle, TextFace, CircleFace, AttrFace, faces
 import ete2
+import tempfile
 
 def get_node_style(n, metadata, colors):
     assert isinstance(n, TreeNode)
     line_width=3
-
+    root = None
     if n.is_root():
         n.dist = 0
 
@@ -60,10 +61,6 @@ def get_tree_style(tree, metadata, colors):
             site = "GI"
         ts.legend.add_face(CircleFace(7, color), column=0)
         ts.legend.add_face(TextFace(" %s" % site, fsize=20), column=1)
-
-    ts.aligned_header.add_face(TextFace("fuck you"), column=0)
-
-
     return ts
 
 def get_metadata(map_file):
@@ -95,10 +92,17 @@ def main():
     metadata = get_metadata(map_file)
     colors = get_colors(metadata)
 
-
-    tree  = dendropy.Tree.get_from_path(tree_file, "nexus")
+    tree  = dendropy.Tree.get_from_path(tree_file, "nexus", extract_comment_metadata=True, store_tree_weights=True)
     assert isinstance(tree, dendropy.Tree)
+    temp = tempfile.NamedTemporaryFile()
+    tree.write_to_path(temp.name, "newick")
+
+    print open(temp.name).readlines()
+    for a in tree.annotations:
+        print a.name, a.value
+
     newick = tree.as_newick_string()
+    print newick
 
     t = Tree("%s;" % newick)
     ts = get_tree_style(t, metadata, colors)
