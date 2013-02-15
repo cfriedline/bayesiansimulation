@@ -128,7 +128,9 @@ def summarize_groups(dir, group_files, missing):
            "asmw6":"brlen=U(0.0, 1.0)",
            "asmw7":"brlen=U(0.1, 1.0)",
            "asmw8":"brlen=0.5",
-           "bsim4":"brlen=0.5"}
+           "bsim4":"brlen=0.5",
+           "bsim5": "brlen=U(0.1, 1.0)",
+           "bsim6": "brlen=U(0.1, 1.0)"}
     total_sims = 0
     for file in group_files:
         data = get_file_data(file)
@@ -244,12 +246,29 @@ def print_missing(missing):
     for k, v in missing.items():
         print k, v
 
+
+def get_bad_mrbayes(out_files, root_dir):
+    bad_file = open(os.path.join(root_dir, "bad_mrbayes.txt"), "w")
+    with bad_file as bad:
+        bad.write("%s\t%s" % ("file", open(out_files[0]).readline()))
+        for outfile in out_files:
+            f = open(outfile)
+            f.readline() # skip header
+            for line in f:
+                line_data = line.rstrip().split("\t")
+                if sum([int(i) for i in line_data[2:5]]) > 0:
+                    bad.write("%s\t%s\n" % (outfile, line))
+    return bad_file.name
+
+
 def main():
     robjects.r("library(ape)")
     args = get_args()
     out_files = get_out_files(args.dir)
+    bad_mrbayes_file = get_bad_mrbayes(out_files, args.dir)
     missing = get_missing(out_files)
     file_mods = compute_mod_time(out_files)
+
     out_groups = group_out_files(out_files)
     group_files = []
     for k in out_groups:
