@@ -14,6 +14,7 @@ from rpy2 import robjects
 from rpy2.robjects import numpy2ri
 import dendropy
 from cStringIO import StringIO
+import gzip
 
 numpy2ri.activate()
 
@@ -32,11 +33,16 @@ def get_args():
 def get_out_files(dir):
     out_files = []
     out = os.path.join(dir, 'out_files.txt')
+    exclude = ['mb', 'log', 'exclude']
     if not os.path.isfile(out):
         with open(out, "w") as f:
             for path, dirs, files in os.walk(dir):
+                for e in exclude:
+                    if e in dirs:
+                        dirs.remove(e)
+
                 for file in files:
-                    if file == 'out.txt':
+                    if file == 'out.txt.gz':
                         out_files.append(os.path.join(path, file))
                         #                        print out_files[:-1]
                         f.write(os.path.join(path, file) + "\n")
@@ -55,7 +61,7 @@ def group_out_files(files):
     group = {}
     for file in files:
         cols = os.path.split(os.path.dirname(os.path.dirname(file)))[1].split("-")[0]
-        fh = open(file)
+        fh = gzip.open(file)
         for line in fh:
             add_to_dict_list(group, cols, line.rstrip())
     return group
@@ -79,7 +85,8 @@ def get_file_data(file):
     with open(file) as f:
         for line in f:
             if not "tree" in line:
-                data.append([int(i) for i in line.rstrip().split("\t")])
+                temp = line.strip().split("\t")
+                data.append([int(i) for i in temp])
     return numpy.array(data)
 
 
@@ -136,7 +143,7 @@ def summarize_groups(dir, group_files, missing):
         data = get_file_data(file)
         total_sims += len(data)
         trees = get_column(data, 0)
-        print file[:-4], len(set(trees)), "missing =", collapsed_missing[file[:-4]]
+        print file[:-4], len(set(trees)), "missing =", collapsed_missing[file[:-4]], len(data)
         f = open(file)
         header = f.readline().rstrip().split("\t")
         rownames = []
@@ -231,7 +238,7 @@ def get_missing(out_files):
         missing[key] = 0
         expected = 0
         total = 10395
-        f = open(file)
+        f = gzip.open(file)
         f.readline() #skip header
         for line in f:
             l = line.rstrip().split("\t")
@@ -252,7 +259,7 @@ def get_bad_mrbayes(out_files, root_dir):
     with bad_file as bad:
         bad.write("%s\t%s" % ("file", open(out_files[0]).readline()))
         for outfile in out_files:
-            f = open(outfile)
+            f = gzip.open(outfile)
             f.readline() # skip header
             for line in f:
                 line_data = line.rstrip().split("\t")
