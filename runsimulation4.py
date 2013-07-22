@@ -34,8 +34,8 @@ gamma_shape = 1
 gamma_scale = 1000
 
 if 'godel' in hostname:
-    mpi = '/test/riveralab/cfriedline/bin/mpirun'
-    mb = '/test/riveralab/cfriedline/src/mrbayes_3.2.1/src/mb'
+    mpi = '/usr/global/openmpi-1.5.3-w-psm/bin/mpirun'
+    mb = '/home/cfriedline/src/mrbayes_3.2.1/src/mb'
     procs = 8
     project_dir = '/home/cfriedline/projects/asmw4'
     mb_new = mb
@@ -195,7 +195,7 @@ def get_tab_string(tuple):
 
 
 @clockit
-def store_valid_matrix_data(r, taxa_tree, num_cols, num_states):
+def store_valid_matrix_data(r, taxa_tree, num_cols, num_states, rate):
     print "Storing valid matrix data in R session"
     r('matrix_data = get_valid_matrix(%d, %d, %f)' % (num_cols, num_states, rate))
     r('data = matrix_data[[1]]')
@@ -320,7 +320,7 @@ def run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_c
 
     tree = app.ape_to_dendropy(r['tree'])
     print tree
-    store_valid_matrix_data(r, taxa_tree, num_cols, num_states)
+    store_valid_matrix_data(r, taxa_tree, num_cols, num_states, filedata['rate'])
     data = numpy.asarray(r['data'])
     roots = list(r['roots'])
     sample_names = numpy.asarray(r('rownames(data)'))
@@ -442,6 +442,7 @@ def get_args():
     p.add_argument("--brlen", help="branch lengths for sample tree", default=0.5)
     p.add_argument("--project_dir", help="root dir for the project", default="../asmw8")
     p.add_argument('--mrbayes_timeout', help="timeout for mrbayes instance", type=float)
+    p.add_argument('--rate', help="rate to simulate matrix", type=float, default=1.0)
 
     args = p.parse_args()
 
@@ -463,7 +464,9 @@ def get_trees(tree_file, out_dir):
 
 def create_file_data(args):
     data = dict()
-    data['description'] = ["%d-%d-%d-%.1f-%s" % (num_taxa, bits, num_states, rate, args.brlen),
+    data['project_dir'] = args.project_dir
+    data['rate'] = args.rate
+    data['description'] = ["%d-%d-%d-%.1f-%s" % (num_taxa, bits, num_states, data['rate'], args.brlen),
                            "%d samples, %d bit encoding, %d states, rate=%.2f, brlen=%s" % (
                                num_taxa, bits, num_states, rate, args.brlen)]
     data['run_dir_name'] = datetime.datetime.now().strftime("%m%d%y_%H%M%S")
@@ -484,6 +487,8 @@ def create_file_data(args):
 
     if os.path.isfile("hostfile"):
         data['hostfile'] = os.path.abspath("hostfile")
+
+    data['rate'] = args.rate
     return data
 
 
@@ -496,12 +501,19 @@ def create_uniform_brlen_tree(taxa_tree, brlen):
     r('%s$edge.length = rep(%f, length(%s$edge.length))' % (temp_name, brlen, temp_name))
     return app.ape_to_dendropy(r[temp_name])
 
+def write_file_data(filedata):
+    f = os.path.join(filedata['project_dir'], 'params.log')
+    with open(f, "w") as out:
+        for k, v in filedata.items():
+            out.write("%s: %s\n" % (k, v))
+
 
 @clockit
 def main():
     args = get_args()
     r = create_R()
     filedata = create_file_data(args)
+    write_file_data(filedata)
 #    sys.stdout = open(os.path.basename("%s_stdout.txt" % args.project_dir), "w")
     sample_trees = get_trees(args.tree_file, filedata['out_dir'])
     out_file = open(os.path.join(filedata['out_dir'], "out.txt"), "w", 0)
