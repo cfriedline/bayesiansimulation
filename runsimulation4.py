@@ -398,6 +398,12 @@ def run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_c
     print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, num_cols, tree_num, sample_names, roots,
         0, filedata)
 
+    return (tree, sample_names, data, gap, abund, abund_ranges,
+            gap_from_abund, new_ranges,
+            mb_tree, mb_diffs,
+            (u_matrix, u_names), (w_matrix, w_names),
+            (u_matrix_norm, u_names_norm), (w_matrix_norm, w_names_norm))
+
 
 def print_taxa_tree(tree, num_cols, filedata):
     assert isinstance(tree, dendropy.Tree)
