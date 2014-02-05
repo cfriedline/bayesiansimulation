@@ -71,8 +71,8 @@ def get_py_unifrac_cluster(uni_matrix, uni_names):
     """
     assert isinstance(uni_matrix, numpy.ndarray)
     r = robjects.r
-    robjects.globalenv['unimatrix'] = robjects.conversion.py2ri(uni_matrix)
-    robjects.globalenv['uninames'] = robjects.conversion.py2ri(uni_names)
+    robjects.globalenv['unimatrix'] = robjects.conversion.py2ri(numpy.array(uni_matrix))
+    robjects.globalenv['uninames'] = robjects.conversion.py2ri(numpy.array(uni_names))
     r('rownames(unimatrix)=uninames')
     r('colnames(unimatrix)=uninames')
     r('unimatrix = as.dist(unimatrix)')
@@ -1073,8 +1073,8 @@ def get_unifrac_nj(matrix, rownames):
     name = _get_random_string(20)
     rows = name + "_rows"
     nj = name + "_nj"
-    robjects.globalenv[name] = robjects.conversion.py2ri(matrix)
-    robjects.globalenv[rows] = robjects.conversion.py2ri(rownames)
+    robjects.globalenv[name] = robjects.conversion.py2ri(numpy.array(matrix))
+    robjects.globalenv[rows] = robjects.conversion.py2ri(numpy.array(rownames))
     r('rownames(%s) = %s' % (name, rows))
     r('%s = nj(as.dist(%s))' % (nj, name))
     tree = r('multi2di(%s)' % nj)
@@ -1125,8 +1125,8 @@ def get_unifrac_pcoa_tree(matrix, rownames):
     euclid = name + "_euclid"
     clust = name + "_clust"
     rows = name + "_rownames"
-    robjects.globalenv[name] = robjects.conversion.py2ri(matrix)
-    robjects.globalenv[rows] = robjects.conversion.py2ri(rownames)
+    robjects.globalenv[name] = robjects.conversion.py2ri(numpy.array(matrix))
+    robjects.globalenv[rows] = robjects.conversion.py2ri(numpy.array(rownames))
     r('rownames(%s) = %s' % (name, rows))
     r('%s = as.dist(%s, diag=T, upper=T)' % (name, name))
     try:
