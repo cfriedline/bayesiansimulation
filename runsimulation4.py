@@ -337,6 +337,8 @@ def run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_c
     abund_ranges = abund_pool[0]
 
     abund = app.get_abundance_matrix(gap, abund_ranges, "gamma", num_states)
+    sub_abund = app.subsample_abundance_matrix(abund, 10)
+    
     (u_matrix, u_names), (w_matrix, w_names) = app.calculate_unifrac(abund, sample_names, taxa_tree)
     (u_matrix_norm, u_names_norm), (w_matrix_norm, w_names_norm) = app.calculate_unifrac(abund, sample_names,
         taxa_tree_fixedbr)
@@ -368,8 +370,8 @@ def run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_c
     gap_from_abund = app.restandardize_matrix(abund, new_ranges, num_states)
     disc = app.get_discrete_matrix_from_standardized(gap_from_abund, bits, sample_names)
     disc2 = app.get_discrete_matrix_from_standardized2(gap_from_abund, num_states, sample_names)
-    mb_tree, mb_diffs = run_mr_bayes(tree_num, 0, disc, sample_names, tree, filedata, mrbayes_timeout)
-    mb_tree2, mb_diffs2 = run_mr_bayes(tree_num, 0, disc2, sample_names, tree, filedata, mrbayes_timeout)
+    #mb_tree, mb_diffs = run_mr_bayes(tree_num, 0, disc, sample_names, tree, filedata, mrbayes_timeout)
+    #mb_tree2, mb_diffs2 = run_mr_bayes(tree_num, 0, disc2, sample_names, tree, filedata, mrbayes_timeout)
 
     # output
     try:
@@ -537,6 +539,8 @@ def main():
         run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, out_file, dist_file,
             args.abundance_from_states,
             filedata, args.brlen, args.mrbayes_timeout)
+        break
+
     out_file.close()
     dist_file.close()
     filedata['range_fh'].close()

@@ -22,7 +22,9 @@ import multiprocessing as mp
 from multiprocessing import Pool, current_process, Manager
 from threading import Timer, Thread, Event, _Timer
 import platform
-
+import random
+from scipy.stats import itemfreq
+from itertools import izip
 #mp_logger = mp.log_to_stderr()
 #mp_logger.setLevel(mp.SUBDEBUG)
 
@@ -1284,3 +1286,32 @@ def correlate_matrices(matrix1, matrix2):
         [m2.append(elem) for elem in matrix2.rx(i + 1, True)]
     return stats.pearsonr(numpy.asarray(m1), numpy.asarray(m2))
 
+@clockit
+def subsample_abundance_matrix(matrix, perc):
+    """
+    :param matrix: abunance matrix as list of lists
+    :param perc: percent of items to keep
+    """
+    sub = []
+    prob = perc/100.0
+    for i, row in enumerate(matrix):
+        pool = []
+        for j, col in enumerate(row):
+            pool.extend([j]*int(col))
+        pool_sub=numpy.random.choice(pool, size=len(pool)*prob, replace=False)
+        hist = _count_unique(pool_sub)
+        row_sub = [0]*len(row)
+        for index, val in izip(hist[0], hist[1]):
+            row_sub[index] = val
+        sub.append(row_sub)
+    return sub, sample_names
+
+def _count_unique(items):
+    """
+    count the unique items in a list
+    :param items: a list of items
+    :return: a tuple of numpy arrays: (keys, values)
+    """
+    uniq_keys = numpy.unique(items)
+    bins = uniq_keys.searchsorted(items)
+    return uniq_keys, numpy.bincount(bins)
