@@ -1304,7 +1304,7 @@ def subsample_abundance_matrix(matrix, perc):
         for index, val in izip(hist[0], hist[1]):
             row_sub[index] = val
         sub.append(row_sub)
-    return sub, sample_names
+    return sub
 
 def _count_unique(items):
     """
