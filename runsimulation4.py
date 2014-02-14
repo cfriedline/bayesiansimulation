@@ -366,15 +366,17 @@ def run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_c
 
     new_ranges = get_column_ranges(numpy.array(abund))
     gap_from_abund = app.restandardize_matrix(abund, new_ranges, num_states)
-    #disc = app.get_discrete_matrix_from_standardized(gap_from_abund, bits, sample_names)
-    disc = app.get_discrete_matrix_from_standardized2(gap_from_abund, num_states, sample_names)
+    disc = app.get_discrete_matrix_from_standardized(gap_from_abund, bits, sample_names)
+    disc2 = app.get_discrete_matrix_from_standardized2(gap_from_abund, num_states, sample_names)
     mb_tree, mb_diffs = run_mr_bayes(tree_num, 0, disc, sample_names, tree, filedata, mrbayes_timeout)
+    mb_tree2, mb_diffs2 = run_mr_bayes(tree_num, 0, disc, sample_names, tree, filedata, mrbayes_timeout)
 
     # output
     try:
-        out_file.write("%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" %
+        out_file.write("%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" %
                    (tree_num, num_cols,
                     get_tab_string(mb_diffs),
+                    get_tab_string(mb_diffs2),
                     get_tab_string(u_pcoa_diffs),
                     get_tab_string(u_cluster_diffs),
                     get_tab_string(u_nj_diffs),
@@ -424,6 +426,7 @@ def print_taxa_tree(tree, num_cols, filedata):
 def get_header():
     return "tree_num\tcols\t"\
            "mb_topo\tmb_symm\tmb_path\t"\
+           "mb_topo2\tmb_symm2\tmb_path2\t"\
            "u_pcoa_topo\tu_pcoa_symm\tu_pcoa_path\t"\
            "u_cluster_topo\tu_cluster_symm\tu_cluster_path\t"\
            "u_nj_topo\tu_nj_symm\tu_nj_path\t"\
