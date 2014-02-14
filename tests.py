@@ -9,6 +9,8 @@ class Tester(unittest.TestCase):
     def setUp(self):
         self.t1 = [1, 0, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0]
         self.t2 = [0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0]
+        self.mb = {"321": "/Users/chris/src/mrbayes_3.2.1/src/mb",
+                   "322" :"/Users/chris/src/mrbayes_3.2.2/src/mb"}
 
     def test_paralin(self):
         # Test per Lake (1994)
@@ -37,5 +39,31 @@ class Tester(unittest.TestCase):
     def _compute_weight(self, num_states, abund, max, min):
         w = round(((abund-min)*(num_states-1))/(max-min))
         return w
+
+    def test_mb_ver(self):
+        import os
+        import app
+        import shutil
+        import dendropy
+        test_dir = "mb_test"
+        if not os.path.exists(test_dir):
+            os.mkdir(test_dir)
+        procs = 8
+        mb_file = "mb_test.nex"
+        mpi = "/usr/local/openmpi/bin/mpirun"
+        mb_con = {}
+        for ver, mb in self.mb.items():
+            mb_ver_file = os.path.join(test_dir, "%s_%s" % (ver, mb_file))
+            shutil.copy(mb_file, mb_ver_file)
+            cmd = [mpi, "-mca", "pml", "ob1", "-mca", "btl", "self,tcp",
+               "-np", str(procs),  mb, os.path.abspath(mb_ver_file)]
+            app._run_mrbayes_cmd(" ".join(cmd), 600)
+            shutil.copy(os.path.join(test_dir, "mb.log"), os.path.join(test_dir, "%s_%s" % (ver, "mb.log")))
+            mb_con[ver] = ("%s.con.tre" % mb_ver_file)
+        trees = [dendropy.Tree.get_from_path(x, "nexus") for x in mb_con.values()]
+        diffs = app.calculate_differences_r(trees[0], trees[1])
+        print diffs
+        assert diffs[0] == 0.0
+
 
 

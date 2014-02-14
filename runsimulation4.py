@@ -23,7 +23,7 @@ project_dir = "/Users/chris/projects/asmw4"
 n_gen = 100000
 mpi = "/usr/local/openmpi/bin/mpirun"
 mb_old = "/Users/chris/src/mrbayes-3.1.2/mb"
-mb_new = "/Users/chris/src/mrbayes_3.2.2/src/mb"
+mb_new = "/Users/chris/src/mrbayes_3.2.1/src/mb"
 mb = mb_old
 procs = 4
 num_taxa = 8
@@ -340,7 +340,7 @@ def run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_c
     (u_matrix, u_names), (w_matrix, w_names) = app.calculate_unifrac(abund, sample_names, taxa_tree)
     (u_matrix_norm, u_names_norm), (w_matrix_norm, w_names_norm) = app.calculate_unifrac(abund, sample_names,
         taxa_tree_fixedbr)
-    
+
     # unifrac tests
     u_pcoa_tree, u_pcoa_diffs = get_unifrac_pcoa(tree, u_matrix, u_names)
     u_cluster_tree, u_cluster_diffs = get_unifrac_cluster(tree, u_matrix, u_names)

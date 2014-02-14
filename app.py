@@ -841,6 +841,30 @@ def create_mrbayes_file(file, matrix, sample_names, num_cols, n_gen):
     file.write("end;\n")
     file.close()
 
+@clockit
+def _run_mrbayes_cmd(cmd_string, timeout):
+    p = Popen(cmd_string, shell = True, stdin = PIPE, stdout = PIPE, stderr = STDOUT, close_fds = True)
+    timer = None
+    if timeout:
+        kill_proc = lambda p: p.kill()
+        timer = Timer(timeout, kill_proc, [p])
+        timer.start()
+
+    stdout, stderr = p.communicate()
+
+    if p.returncode != 0:
+        print "MrBayes timeout, killing on %s!" % platform.uname()[1]
+        if timeout:
+            timer.cancel()
+        return _run_mrbayes_cmd(cmd_string, timeout)
+
+    if timeout:
+        timer.cancel()
+
+#    for line in iter(p.stdout.readline, ''):
+#        print line.rstrip()
+#
+
 
 @clockit
 def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, out_dir, num_samples, name_flag,
@@ -887,27 +911,9 @@ def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, 
 
     cmd_string = " ".join([str(elem) for elem in cmd])
     print cmd_string
-    p = Popen(cmd_string, shell = True, stdin = PIPE, stdout = PIPE, stderr = STDOUT, close_fds = True)
-    timer = None
-    if timeout:
-        kill_proc = lambda p: p.kill()
-        timer = Timer(timeout, kill_proc, [p])
-        timer.start()
 
-    stdout, stderr = p.communicate()
+    _run_mrbayes_cmd(cmd_string, timeout)
 
-    if p.returncode != 0:
-        print "MrBayes timeout, killing on %s!" % platform.uname()[1]
-        if timeout:
-            timer.cancel()
-        return run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, out_dir, num_samples, name_flag, hostfile, timeout)
-
-    if timeout:
-        timer.cancel()
-
-#    for line in iter(p.stdout.readline, ''):
-#        print line.rstrip()
-#
     mbresult = os.path.abspath(mb_file) + ".con.tre"
 
     if not os.path.exists(mbresult):
