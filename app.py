@@ -1205,10 +1205,33 @@ def log(text, writer):
     writer.write("%s\n" % text)
     writer.flush()
 
+def get_discrete_matrix_from_standardized2(gap, bits, sample_names):
+    """
+    creates a binary matrix from a standardized matrix (7 = 11111110) and returns
+    that matrix as an rpy2.Matrix
+    @param gap: the gap standard matrix
+    @param bits: the nubmer of bits to encode the integers
+    @param sample_names: the names of the samples (rows in the matrix)
+    @return: the rpy2 Matrix
+    @rtype: robjects.Matrix
+    """
+    print "Creating new discrete matrix"
+    r = robjects.r
+    disc = []
+    for row in gap:
+        row_string = ''.join([''.join(["1"]*int(elem)).ljust(bits, "0") for elem in row])
+        disc.append([int(elem) for elem in row_string])
+    disc = numpy.array(disc)
+    r_name = _get_random_string(20)
+    robjects.globalenv[r_name] = disc
+    robjects.globalenv[r_name + "_rownames"] = sample_names
+    r('rownames(%s) = %s' % (r_name, r_name + "_rownames"))
+    return r[r_name]
+
 
 def get_discrete_matrix_from_standardized(gap, bits, sample_names):
     """
-    creates a discrete matrix from a standardized matrix and returns
+    creates a discrete matrix from a standardized matrix (7 = 111) and returns
     that matrix as an rpy2.Matrix
     @param gap: the gap standard matrix
     @param bits: the nubmer of bits to encode the integers

@@ -366,7 +366,8 @@ def run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_c
 
     new_ranges = get_column_ranges(numpy.array(abund))
     gap_from_abund = app.restandardize_matrix(abund, new_ranges, num_states)
-    disc = app.get_discrete_matrix_from_standardized(gap_from_abund, bits, sample_names)
+    #disc = app.get_discrete_matrix_from_standardized(gap_from_abund, bits, sample_names)
+    disc = app.get_discrete_matrix_from_standardized2(gap_from_abund, num_states, sample_names)
     mb_tree, mb_diffs = run_mr_bayes(tree_num, 0, disc, sample_names, tree, filedata, mrbayes_timeout)
 
     # output
