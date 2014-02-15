@@ -1,7 +1,7 @@
 from kombu import Queue
 
-BROKER_URL = 'amqp://guest@godel97'
-CELERY_RESULT_BACKEND = 'redis://godel97/0'
+BROKER_URL = 'amqp://'
+CELERY_RESULT_BACKEND = 'amqp://'
 CELERY_TASK_SERIALIZER = 'pickle'
 CELERY_RESULT_SERIALIZER = 'pickle'
 CELERY_ACCEPT_CONTENT=['pickle', 'json']

@@ -21,7 +21,7 @@ numpy2ri.activate()
 sys.setrecursionlimit(1000000)
 
 app = Celery('tasks')
-app.config_from_object('config')
+app.config_from_object('localconfig')
 
 hostname = os.uname()[1]
 project_dir = "/Users/chris/projects/asmw4"
