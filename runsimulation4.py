@@ -32,7 +32,7 @@ mpi = "/usr/local/openmpi/bin/mpirun"
 mb_old = "/Users/chris/src/mrbayes-3.1.2/mb"
 mb_new = "/Users/chris/src/mrbayes_3.2.1/src/mb"
 mb = mb_old
-procs = 4
+procs = 8
 num_taxa = 8
 num_states = 8
 bits = 3
@@ -558,13 +558,15 @@ def main():
     taxa_tree_fixedbr = create_uniform_brlen_tree(taxa_tree, 0.5)
     print_taxa_tree(taxa_tree, col, filedata)
     submit_count = 0
+    celery_results = []
     for tree_num, sample_tree in enumerate(sample_trees):
 
         if filedata['celery']:
             print tree_num
-            run_simulation.delay(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, None, None,
+            res = run_simulation.delay(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, None, None,
                 args.abundance_from_states,
                 filedata, args.brlen, args.mrbayes_timeout)
+            celery_results.append(res)
             submit_count += 1
             if submit_count == 8:
                 break
@@ -572,6 +574,21 @@ def main():
             run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, out_file, dist_file,
                 args.abundance_from_states,
                 filedata, args.brlen, args.mrbayes_timeout)
+
+    if filedata['celery']:
+        for i, res in enumerate(celery_results):
+            res = res.get()
+            print "getting results for task %d" % i
+            o = open(res[0])
+            d = open(res[1])
+            for line in o:
+                out_file.write("%s" % line)
+            for line in d:
+                dist_file.write("%s" % line)
+            o.close()
+            d.close()
+            os.unlink(res[0])
+            os.unlink(res[1])
     out_file.close()
     dist_file.close()
     filedata['range_fh'].close()
