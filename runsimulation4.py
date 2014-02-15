@@ -15,9 +15,13 @@ import dendropy
 import sys
 import argparse
 import celery
+from celery import Celery
 
 numpy2ri.activate()
 sys.setrecursionlimit(1000000)
+
+app = Celery('tasks')
+app.config_from_object('config')
 
 hostname = os.uname()[1]
 project_dir = "/Users/chris/projects/asmw4"
@@ -309,6 +313,7 @@ def is_float(num):
 
 
 @clockit
+@app.task()
 def run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols, out_file, dist_file,
                    abundance_from_states, filedata, brlen, mrbayes_timeout):
     assert isinstance(taxa_tree, dendropy.Tree)
