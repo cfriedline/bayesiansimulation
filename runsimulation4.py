@@ -14,6 +14,7 @@ from app import clockit
 import dendropy
 import sys
 import argparse
+import celery
 
 numpy2ri.activate()
 sys.setrecursionlimit(1000000)
@@ -455,7 +456,7 @@ def get_args():
     p.add_argument("--project_dir", help="root dir for the project", default="../asmw8")
     p.add_argument('--mrbayes_timeout', help="timeout for mrbayes instance", type=float)
     p.add_argument('--rate', help="rate to simulate matrix", type=float, default=1.0)
-    p.add_argument('--celery', help="use celery parallelism", type=bool, default=False)
+    p.add_argument('--celery', help="use celery parallelism", action='store_true')
 
     args = p.parse_args()
 
@@ -538,9 +539,15 @@ def main():
     taxa_tree_fixedbr = create_uniform_brlen_tree(taxa_tree, 0.5)
     print_taxa_tree(taxa_tree, col, filedata)
     for tree_num, sample_tree in enumerate(sample_trees):
-        run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, out_file, dist_file,
-            args.abundance_from_states,
-            filedata, args.brlen, args.mrbayes_timeout)
+
+        if filedata['celery']:
+            run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, None, None,
+                args.abundance_from_states,
+                filedata, args.brlen, args.mrbayes_timeout)
+        else:
+            run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, out_file, dist_file,
+                args.abundance_from_states,
+                filedata, args.brlen, args.mrbayes_timeout)
     out_file.close()
     dist_file.close()
     filedata['range_fh'].close()
