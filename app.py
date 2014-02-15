@@ -1,9 +1,9 @@
 import os
-import random
 import string
 import traceback
+
 import rpy2.rinterface as rinterface
-import sys
+
 
 rinterface.set_initoptions(('rpy2', '--vanilla', '--max-ppsize=500000', '--quiet'))
 
@@ -20,10 +20,9 @@ import math
 import stopwatch
 import multiprocessing as mp
 from multiprocessing import Pool, current_process, Manager
-from threading import Timer, Thread, Event, _Timer
+from threading import Timer
 import platform
 import random
-from scipy.stats import itemfreq
 from itertools import izip
 #mp_logger = mp.log_to_stderr()
 #mp_logger.setLevel(mp.SUBDEBUG)
@@ -832,7 +831,7 @@ def create_mrbayes_file(file, matrix, sample_names, num_cols, n_gen):
     file.write("END;\n\n")
 
     file.write("begin mrbayes;\n")
-    file.write("log start filename=%s replace;\n" % os.path.join(os.path.dirname(file.name), "mb.log"))
+    file.write("log start filename=%s replace;\n" % os.path.join(os.path.dirname(file.name), "mb_%s.log" % _get_random_string(10)))
     file.write("set autoclose=yes nowarn=yes;\n")
     file.write("lset rates=equal coding=all;\n")
     #file.write("mcmcp checkpoint=yes;\n")
@@ -896,8 +895,9 @@ def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, 
     mb_file = os.path.join(mb_dir, "mb_%d_%d_%s_%s_%s.nex" % (num_samples, matrix.ncol, dist_name, i, name_flag))
 
     create_mrbayes_file(open(mb_file, "w"), matrix, sample_names, matrix.ncol, n_gen)
-    cmd = [mpi, "-mca", "pml", "ob1", "-mca", "btl", "self,tcp",
-           "-np", procs, mb, os.path.abspath(mb_file)]
+    #cmd = [mpi, "-mca", "pml", "ob1", "-mca", "btl", "self,tcp", "-np", procs, mb, os.path.abspath(mb_file)]
+    cmd = [mpi, "-np", procs, mb, os.path.abspath(mb_file)]
+
     temp_file = None
     if hostfile:
         hosts = []
@@ -908,8 +908,8 @@ def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, 
         with temp_file:
             for host in hosts:
                 temp_file.write("%s\n" % host)
-        cmd = [mpi, "-mca", "pml", "ob1", "-mca", "btl", "self,tcp",
-               "-np", procs, "--hostfile", temp_file.name, mb, os.path.abspath(mb_file)]
+        #cmd = [mpi, "-mca", "pml", "ob1", "-mca", "btl", "self,tcp","-np", procs, "--hostfile", temp_file.name, mb, os.path.abspath(mb_file)]
+        cmd = [mpi, "-np", procs, "--hostfile", temp_file.name, mb, os.path.abspath(mb_file)]
 
     cmd_string = " ".join([str(elem) for elem in cmd])
     print cmd_string

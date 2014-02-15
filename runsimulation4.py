@@ -16,12 +16,14 @@ import sys
 import argparse
 import celery
 from celery import Celery
+from runsimulation4 import * #workaround for celery
+import tempfile
 
 numpy2ri.activate()
 sys.setrecursionlimit(1000000)
 
-app = Celery('tasks')
-app.config_from_object('localconfig')
+cluster = Celery('runsimulation4')
+cluster.config_from_object('localconfig')
 
 hostname = os.uname()[1]
 project_dir = "/Users/chris/projects/asmw4"
@@ -312,11 +314,22 @@ def is_float(num):
         return False
 
 
-@clockit
-@app.task()
-def run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols, out_file, dist_file,
+@cluster.task()
+def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols, out_file, dist_file,
                    abundance_from_states, filedata, brlen, mrbayes_timeout):
     assert isinstance(taxa_tree, dendropy.Tree)
+    out_file_name = out_file
+    dist_file_name = dist_file
+    is_celery = False
+    r = create_R()
+    if not out_file:
+        is_celery = True
+        out_file = tempfile.NamedTemporaryFile(dir=".", delete=False)
+        out_file_name = out_file.name
+    if not dist_file:
+        dist_file = tempfile.NamedTemporaryFile(dir=".", delete=False)
+        dist_file_name = dist_file.name
+
     r('temp=rtree(%d, rooted=F)' % num_taxa)
     r('edges = runif(length(temp$edge.length), min=0.1)')
     r('tree=read.tree(text="%s")' % sample_tree)
@@ -404,12 +417,14 @@ def run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_c
         print "Unexpected error in writing output", sys.exc_info()
         sys.exit()
 
-
+    if is_celery:
+        out_file.close()
+        dist_file.close()
 
     print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, num_cols, tree_num, sample_names, roots,
         0, filedata)
 
-    return (tree, sample_names, data, gap, abund, abund_ranges,
+    return (out_file_name, dist_file_name, tree, sample_names, data, gap, abund, abund_ranges,
             gap_from_abund, new_ranges,
             mb_tree, mb_diffs,
             (u_matrix, u_names), (w_matrix, w_names),
@@ -531,7 +546,6 @@ def write_file_data(filedata):
 @clockit
 def main():
     args = get_args()
-    r = create_R()
     filedata = create_file_data(args)
     write_file_data(filedata)
 #    sys.stdout = open(os.path.basename("%s_stdout.txt" % args.project_dir), "w")
@@ -543,14 +557,19 @@ def main():
     taxa_tree = app.create_tree(col, "T")
     taxa_tree_fixedbr = create_uniform_brlen_tree(taxa_tree, 0.5)
     print_taxa_tree(taxa_tree, col, filedata)
+    submit_count = 0
     for tree_num, sample_tree in enumerate(sample_trees):
 
         if filedata['celery']:
-            run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, None, None,
+            print tree_num
+            run_simulation.delay(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, None, None,
                 args.abundance_from_states,
                 filedata, args.brlen, args.mrbayes_timeout)
+            submit_count += 1
+            if submit_count == 8:
+                break
         else:
-            run_simulation(r, taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, out_file, dist_file,
+            run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, out_file, dist_file,
                 args.abundance_from_states,
                 filedata, args.brlen, args.mrbayes_timeout)
     out_file.close()

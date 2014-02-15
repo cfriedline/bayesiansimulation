@@ -2,3 +2,4 @@
 *.pyc
 mb_test*
 bsim
+tmp*
