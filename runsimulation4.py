@@ -455,6 +455,7 @@ def get_args():
     p.add_argument("--project_dir", help="root dir for the project", default="../asmw8")
     p.add_argument('--mrbayes_timeout', help="timeout for mrbayes instance", type=float)
     p.add_argument('--rate', help="rate to simulate matrix", type=float, default=1.0)
+    p.add_argument('--celery', help="use celery parallelism", type=bool, default=False)
 
     args = p.parse_args()
 
@@ -501,6 +502,7 @@ def create_file_data(args):
         data['hostfile'] = os.path.abspath("hostfile")
 
     data['rate'] = args.rate
+    data['celery'] = args.celery
     return data
 
 
