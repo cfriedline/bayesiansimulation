@@ -46,6 +46,7 @@ if 'godel' in hostname:
     procs = 8
     project_dir = '/home/cfriedline/projects/asmw4'
     mb_new = mb
+    cluster.config_from_object('clusterconfig')
 elif 'phylogeny' in hostname:
     mpi = '/usr/local/bin/mpirun'
     mb = '/home/cfriedline/src/mrbayes_3.2.1/src/mb'

@@ -852,7 +852,6 @@ def _run_mrbayes_cmd(cmd_string, timeout):
         timer.start()
 
     stdout, stderr = p.communicate()
-
     if p.returncode != 0:
         print "MrBayes timeout, killing on %s!" % platform.uname()[1]
         if timeout:
@@ -908,8 +907,8 @@ def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, 
         with temp_file:
             for host in hosts:
                 temp_file.write("%s\n" % host)
-        #cmd = [mpi, "-mca", "pml", "ob1", "-mca", "btl", "self,tcp","-np", procs, "--hostfile", temp_file.name, mb, os.path.abspath(mb_file)]
-        cmd = [mpi, "-np", procs, "--hostfile", temp_file.name, mb, os.path.abspath(mb_file)]
+        cmd = [mpi, "-mca", "pml", "ob1", "-mca", "btl", "self,tcp","-np", procs, "--hostfile", temp_file.name, mb, os.path.abspath(mb_file)]
+        #cmd = [mpi, "-np", procs, "--hostfile", temp_file.name, mb, os.path.abspath(mb_file)]
 
     cmd_string = " ".join([str(elem) for elem in cmd])
     print cmd_string
