@@ -93,6 +93,16 @@ def create_R():
         }
     """)
 
+    r("""
+        get_continuous_matrix = function(cols) {
+            r = rgamma(1, shape=1000, rate=1)
+            m = replicate(cols, rTraitCont(tree, ancestor=F, sigma=r*0.5, root=r))
+            m = round(as.matrix(m))
+            return(list(m, r))
+        }
+
+    """)
+
     return r
 
 
@@ -206,11 +216,15 @@ def get_tab_string(tuple):
 def store_valid_matrix_data(r, taxa_tree, num_cols, num_states, rate):
     print "Storing valid matrix data in R session"
     r('matrix_data = get_valid_matrix(%d, %d, %f)' % (num_cols, num_states, rate))
+    r('cont_matrix_data = get_continuous_matrix(%d)' % num_cols)
     r('data = matrix_data[[1]]')
     r('roots = matrix_data[[2]]')
+    r('data_cont = cont_matrix_data[[1]]')
+    r('roots_cont = cont_matrix_data[[2]]')
     r("data = t(apply(data, 1, as.numeric))")
     robjects.globalenv['colnames'] = sorted(taxa_tree.taxon_set.labels())
     r('colnames(data) = colnames')
+    r('colnames(data_cont) = colnames')
 
 
 def get_unifrac_pcoa(tree, matrix, rownames):
