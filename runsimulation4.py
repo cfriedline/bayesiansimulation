@@ -420,10 +420,11 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
 
     # output
     try:
-        out_file.write("%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" %
+        out_file.write("%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" %
                    (tree_num, num_cols,
                     get_tab_string(mb_diffs),
                     get_tab_string(mb_diffs2),
+                    get_tab_string(mb_diffs_cont),
                     get_tab_string(u_pcoa_diffs),
                     get_tab_string(u_cluster_diffs),
                     get_tab_string(u_nj_diffs),
@@ -476,6 +477,7 @@ def get_header():
     return "tree_num\tcols\t"\
            "mb_topo\tmb_symm\tmb_path\t"\
            "mb_topo2\tmb_symm2\tmb_path2\t"\
+           "mb_topo_cont\tmb_symm_cont\tmb_path_cont\t"\
            "u_pcoa_topo\tu_pcoa_symm\tu_pcoa_path\t"\
            "u_cluster_topo\tu_cluster_symm\tu_cluster_path\t"\
            "u_nj_topo\tu_nj_symm\tu_nj_path\t"\
@@ -600,7 +602,8 @@ def main():
             run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, out_file, dist_file,
                 args.abundance_from_states,
                 filedata, args.brlen, args.mrbayes_timeout)
-            break
+            if tree_num == 3:
+                break
 
     if filedata['celery']:
         for i, res in enumerate(celery_results):
