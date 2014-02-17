@@ -415,7 +415,7 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     disc2 = app.get_discrete_matrix_from_standardized2(gap_from_abund, num_states, sample_names)
     cont_disc = app.get_discrete_matrix_from_standardized2(cont_gap, num_states, sample_names)
     mb_tree, mb_diffs = run_mr_bayes(tree_num, 0, disc, sample_names, tree, filedata, mrbayes_timeout)
-    mb_tree2, mb_diffs2 = run_mr_bayes(tree_num, 0, sub_disc, sample_names, tree, filedata, mrbayes_timeout)
+    mb_tree2, mb_diffs2 = run_mr_bayes(tree_num, 0, disc2, sample_names, tree, filedata, mrbayes_timeout)
     mb_tree_cont, mb_diffs_cont = run_mr_bayes(tree_num, 0, cont_disc, sample_names, tree, filedata, mrbayes_timeout)
 
     # output
