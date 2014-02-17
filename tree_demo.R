@@ -23,7 +23,7 @@ get_valid_matrix = function(cols, numstates, rate) {
 
 get_continuous_matrix = function(cols) {
     r = rgamma(1, shape=1000, rate=1)
-    m = replicate(cols, rTraitCont(tree, ancestor=T, sigma=r*0.5, root=r))
+    m = replicate(cols, rTraitCont(tree, ancestor=T, sigma=r*0.5, root.value=r))
     m = round(as.matrix(m))
     return(list(m, r))
 }
@@ -34,8 +34,8 @@ data1 = get_continuous_matrix(1)
 x = data[[1]]
 x1 = data1[[1]]
 x1 = ifelse(x1<0, 0, x1)
+labels = x
 plot(tree, show.tip.label=F)
-labels = x1
 Y <- labels[1:8]
 A <- labels[-(1:8)]
 nodelabels(A)
