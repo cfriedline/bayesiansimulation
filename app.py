@@ -663,6 +663,11 @@ def get_random_abundance(weight, col_range):
     rand = numpy.random.uniform(low = r[0], high = r[1])
     return round(rand)
 
+@clockit
+def get_continuous_abundance_matrix(r):
+    return numpy.array(r('data_cont')).tolist()
+
+
 
 @clockit
 def get_abundance_matrix(gap, ranges, dist, num_states):

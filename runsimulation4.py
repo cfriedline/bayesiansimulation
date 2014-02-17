@@ -109,7 +109,10 @@ def create_R():
 def get_column_ranges(data):
     ranges = []
     for col in data.T:
-        ranges.append((min(col), max(col)))
+        minval = min(col)
+        if minval < 0:
+            minval = 0
+        ranges.append((minval, max(col)))
     return ranges
 
 
@@ -372,6 +375,10 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
 
     abund = app.get_abundance_matrix(gap, abund_ranges, "gamma", num_states)
     sub_abund = app.subsample_abundance_matrix(abund, 10)
+    cont_abund = app.get_continuous_abundance_matrix(r)
+    cont_ranges = get_column_ranges(numpy.array(cont_abund))
+    print cont_ranges
+    return
 
     (u_matrix, u_names), (w_matrix, w_names) = app.calculate_unifrac(abund, sample_names, taxa_tree)
     (u_matrix_norm, u_names_norm), (w_matrix_norm, w_names_norm) = app.calculate_unifrac(abund, sample_names,
@@ -589,6 +596,7 @@ def main():
             run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, out_file, dist_file,
                 args.abundance_from_states,
                 filedata, args.brlen, args.mrbayes_timeout)
+            break
 
     if filedata['celery']:
         for i, res in enumerate(celery_results):
