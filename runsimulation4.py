@@ -223,6 +223,7 @@ def store_valid_matrix_data(r, taxa_tree, num_cols, num_states, rate):
     r('data = matrix_data[[1]]')
     r('roots = matrix_data[[2]]')
     r('data_cont = cont_matrix_data[[1]]')
+    r('data_cont = ifelse(data_cont < 0, 0, data_cont)')
     r('roots_cont = cont_matrix_data[[2]]')
     r("data = t(apply(data, 1, as.numeric))")
     robjects.globalenv['colnames'] = sorted(taxa_tree.taxon_set.labels())
@@ -375,10 +376,11 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
 
     abund = app.get_abundance_matrix(gap, abund_ranges, "gamma", num_states)
     sub_abund = app.subsample_abundance_matrix(abund, 10)
+
+    #continus matrix to gap to discrete matrix
     cont_abund = app.get_continuous_abundance_matrix(r)
     cont_ranges = get_column_ranges(numpy.array(cont_abund))
-    print cont_ranges
-    return
+    cont_gap = app.restandardize_matrix(cont_abund, cont_ranges, num_states)
 
     (u_matrix, u_names), (w_matrix, w_names) = app.calculate_unifrac(abund, sample_names, taxa_tree)
     (u_matrix_norm, u_names_norm), (w_matrix_norm, w_names_norm) = app.calculate_unifrac(abund, sample_names,
@@ -411,8 +413,10 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     gap_from_abund = app.restandardize_matrix(abund, new_ranges, num_states)
     disc = app.get_discrete_matrix_from_standardized(gap_from_abund, bits, sample_names)
     disc2 = app.get_discrete_matrix_from_standardized2(gap_from_abund, num_states, sample_names)
+    cont_disc = app.get_discrete_matrix_from_standardized2(cont_gap, num_states, sample_names)
     mb_tree, mb_diffs = run_mr_bayes(tree_num, 0, disc, sample_names, tree, filedata, mrbayes_timeout)
-    mb_tree2, mb_diffs2 = run_mr_bayes(tree_num, 0, disc2, sample_names, tree, filedata, mrbayes_timeout)
+    mb_tree2, mb_diffs2 = run_mr_bayes(tree_num, 0, sub_disc, sample_names, tree, filedata, mrbayes_timeout)
+    mb_tree_cont, mb_diffs_cont = run_mr_bayes(tree_num, 0, cont_disc, sample_names, tree, filedata, mrbayes_timeout)
 
     # output
     try:
