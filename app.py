@@ -8,7 +8,7 @@ import rpy2.rinterface as rinterface
 rinterface.set_initoptions(('rpy2', '--vanilla', '--max-ppsize=500000', '--quiet'))
 
 import numpy
-from subprocess import  Popen, PIPE, STDOUT
+from subprocess import Popen, PIPE, STDOUT
 import dendropy
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
@@ -95,11 +95,11 @@ def calculate_unifrac(abund, sample_names, taxa_tree):
     """
     unifrac_dict = _create_unifrac_dict(abund, sample_names, taxa_tree)
     tree = dendropy_to_cogent(taxa_tree)
-    unweighted = fast_unifrac(tree, unifrac_dict, modes = {UNIFRAC_DIST_MATRIX}, is_symmetric = True, weighted = False)
+    unweighted = fast_unifrac(tree, unifrac_dict, modes={UNIFRAC_DIST_MATRIX}, is_symmetric=True, weighted=False)
     un_matrix = unweighted[UNIFRAC_DIST_MATRIX][0]
     un_rows = unweighted[UNIFRAC_DIST_MATRIX][1]
 
-    weighted = fast_unifrac(tree, unifrac_dict, modes = {UNIFRAC_DIST_MATRIX}, is_symmetric = True, weighted = True)
+    weighted = fast_unifrac(tree, unifrac_dict, modes={UNIFRAC_DIST_MATRIX}, is_symmetric=True, weighted=True)
     w_matrix = weighted[UNIFRAC_DIST_MATRIX][0]
     w_rows = weighted[UNIFRAC_DIST_MATRIX][1]
     return (un_matrix, un_rows), (w_matrix, w_rows)
@@ -137,7 +137,7 @@ def make_tree_binary(tree_string):
     robjects.globalenv['temptree'] = tree_string + ";"
     tree = r('multi2di(read.tree(text=temptree))')
     f = tempfile.NamedTemporaryFile()
-    r['write.nexus'](tree, file = f.name)
+    r['write.nexus'](tree, file=f.name)
     tree = dendropy.Tree.get_from_path(f.name, "nexus")
     f.close()
     return tree
@@ -152,7 +152,7 @@ def get_paralinear_cluster():
     r = robjects.r
     tree = r('multi2di(as.phylo(paralinear_cluster))')
     f = tempfile.NamedTemporaryFile()
-    r['write.nexus'](tree, file = f.name)
+    r['write.nexus'](tree, file=f.name)
     tree = dendropy.Tree.get_from_path(f.name, "nexus")
     f.close()
     return tree
@@ -243,7 +243,7 @@ def _create_paralin_matrix(a):
     @rtype tuple
     """
     assert isinstance(a, robjects.Matrix)
-    dist = numpy.zeros(shape = (a.nrow, a.nrow))
+    dist = numpy.zeros(shape=(a.nrow, a.nrow))
     valid = True
     for i in xrange(a.nrow):
         for j in range(i + 1):
@@ -264,9 +264,9 @@ def get_paralin_distance(seq1, seq2):
     @return: the paralinear distance
     @rtype: float
     """
-    j = numpy.zeros(shape = (2, 2))
-    d1 = numpy.zeros(shape = (2, 2))
-    d2 = numpy.zeros(shape = (2, 2))
+    j = numpy.zeros(shape=(2, 2))
+    d1 = numpy.zeros(shape=(2, 2))
+    d2 = numpy.zeros(shape=(2, 2))
     for pos, c in enumerate(seq1):
         c1 = int(c)
         c2 = int(seq2[pos])
@@ -328,8 +328,8 @@ def _generate_candidate_triplet_discrete_matrix(num_cols, num_samples, sample_tr
     robjects.globalenv['numcols'] = usable_cols
     robjects.globalenv['newick'] = newick + ";"
     r("tree = read.tree(text=newick)")
-    r('m = matrix(nrow=length(tree$tip.label))') #create empty matrix
-    r('m = m[,-1]') #drop the first NA column
+    r('m = matrix(nrow=length(tree$tip.label))')  #create empty matrix
+    r('m = m[,-1]')  #drop the first NA column
     num_procs = mp.cpu_count()
     args = []
     div, mod = divmod(usable_cols, num_procs)
@@ -340,8 +340,8 @@ def _generate_candidate_triplet_discrete_matrix(num_cols, num_samples, sample_tr
         args[-1] += mod
         args[i] -= mod
     manager = Manager()
-    pool = Pool(processes = num_procs, maxtasksperchild = 1)
-    q = manager.Queue(maxsize = num_procs)
+    pool = Pool(processes=num_procs, maxtasksperchild=1)
+    q = manager.Queue(maxsize=num_procs)
     for arg in args:
         pool.apply_async(_get_valid_triplets, (num_samples, arg, bits, q))
     pool.close()
@@ -358,15 +358,15 @@ def _generate_candidate_triplet_discrete_matrix(num_cols, num_samples, sample_tr
         r('m = cbind(m, %s)' % name)
 
     r('m = m[,1:%d]' % usable_cols)
-    r('m = m[order(rownames(m)),]') # consistently order the rows (for unifrac compatibility)
-    r('m = t(apply(m, 1, as.numeric))') # convert all factors given by rTraitDisc to numeric
+    r('m = m[order(rownames(m)),]')  # consistently order the rows (for unifrac compatibility)
+    r('m = t(apply(m, 1, as.numeric))')  # convert all factors given by rTraitDisc to numeric
     a = r['m']
     n = r('rownames(m)')
     return a, n
 
 
 @clockit
-def create_discrete_matrix(num_cols, num_samples, sample_tree, bits, accept_cols = False):
+def create_discrete_matrix(num_cols, num_samples, sample_tree, bits, accept_cols=False):
     """
     Creates a discrete char matrix from a tree
     @param num_cols: number of columns to create
@@ -401,7 +401,7 @@ def create_discrete_matrix(num_cols, num_samples, sample_tree, bits, accept_cols
     free_paralin_matrix, free_valid = _create_paralin_matrix(b)
 
     if triplet_valid is False or free_valid is False:
-        sample_tree = create_tree(num_samples, type = "S")
+        sample_tree = create_tree(num_samples, type="S")
         return create_discrete_matrix(num_cols, num_samples, sample_tree, bits)
     else:
         robjects.globalenv['paralin_matrix'] = triplet_paralin_matrix
@@ -462,7 +462,7 @@ def _append_gap_ranges(data, states):
 
 
 @clockit
-def get_range_from_gamma(num_cols, bits, gamma_shape, gamma_scale, smallest_max, accept_cols = False):
+def get_range_from_gamma(num_cols, bits, gamma_shape, gamma_scale, smallest_max, accept_cols=False):
     """
     gets a range of random column totals from a gamma distribution
     of given shape and scale
@@ -484,10 +484,11 @@ def get_range_from_gamma(num_cols, bits, gamma_shape, gamma_scale, smallest_max,
     _append_gap_ranges(data, states)
     return data
 
+
 #    return numpy.array(data)
 
 @clockit
-def get_range_from_normal(num_cols, bits, mean, sd, smallest_max, accept_cols = False):
+def get_range_from_normal(num_cols, bits, mean, sd, smallest_max, accept_cols=False):
     """
     gets a range of random column totals from a normal distribution
     of given shape and scale
@@ -521,7 +522,7 @@ def get_random_min_and_max_from_normal(mean, sd, min):
     max = get_random_from_normal(mean, sd)
     while max < min:
         max = get_random_from_normal(mean, sd)
-    min = round(numpy.random.uniform(low = 0.0, high = max / 8.0))
+    min = round(numpy.random.uniform(low=0.0, high=max / 8.0))
     return [min, max, []]
 
 
@@ -536,7 +537,7 @@ def get_random_min_and_max_from_gamma(gamma_shape, gamma_scale, min):
     max = get_random_from_gamma(gamma_shape, gamma_scale)
     while max < min:
         max = get_random_from_gamma(gamma_shape, gamma_scale)
-    min = round(numpy.random.uniform(low = 0.0, high = max / 8.0))
+    min = round(numpy.random.uniform(low=0.0, high=max / 8.0))
     return [min, max, []]
 
 
@@ -660,13 +661,13 @@ def get_random_abundance(weight, col_range):
     @rypte: int
     """
     r = col_range[2][int(weight)]
-    rand = numpy.random.uniform(low = r[0], high = r[1])
+    rand = numpy.random.uniform(low=r[0], high=r[1])
     return round(rand)
+
 
 @clockit
 def get_continuous_abundance_matrix(r):
     return numpy.array(r('data_cont')).tolist()
-
 
 
 @clockit
@@ -683,8 +684,8 @@ def get_abundance_matrix(gap, ranges, dist, num_states):
     """
     print "Getting %s abundance matrix" % dist
     data = []
-    col_min = [False] * len(gap[0]) # stores whether min has been found for a col
-    col_max = [False] * len(gap[0]) # stores whether max has been found for a col
+    col_min = [False] * len(gap[0])  # stores whether min has been found for a col
+    col_max = [False] * len(gap[0])  # stores whether max has been found for a col
 
     for i, row in enumerate(gap):
         data.append([None] * len(col_min))
@@ -726,7 +727,7 @@ def restandardize_matrix(abund, ranges, num_states):
             if range[0] == range[1] and range[0] > 0:
                 raise Exception("dupe range found at row %d %s" % (i, range), [row[j] for row in abund])
             if range[1] > 0:
-                data[i][j] = compute_weight(num_states, abund = val, max = range[1], min = range[0])
+                data[i][j] = compute_weight(num_states, abund=val, max=range[1], min=range[0])
             else:
                 data[i][j] = 0
     return data
@@ -755,7 +756,7 @@ def get_unifrac_cluster(matrix, rownames):
     assert isinstance(matrix, numpy.ndarray)
     nr, nc = matrix.shape
     matrix_vec = robjects.FloatVector(matrix.transpose().reshape(matrix.size))
-    matrix_r = r.matrix(matrix_vec, nrow = nr, ncol = nc)
+    matrix_r = r.matrix(matrix_vec, nrow=nr, ncol=nc)
     robjects.globalenv[name] = matrix_r
     robjects.globalenv[rows] = rownames
     print r[name]
@@ -847,9 +848,10 @@ def create_mrbayes_file(file, log_file, matrix, sample_names, num_cols, n_gen):
     file.write("end;\n")
     file.close()
 
+
 @clockit
 def _run_mrbayes_cmd(cmd_string, timeout):
-    p = Popen(cmd_string, shell = True, stdin = PIPE, stdout = PIPE, stderr = STDOUT, close_fds = True)
+    p = Popen(cmd_string, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT, close_fds=True)
     timer = None
     if timeout:
         kill_proc = lambda p: p.kill()
@@ -865,6 +867,7 @@ def _run_mrbayes_cmd(cmd_string, timeout):
 
     if timeout:
         timer.cancel()
+
 
 #    for line in iter(p.stdout.readline, ''):
 #        print line.rstrip()
@@ -896,7 +899,8 @@ def run_mrbayes(key, i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, d
     mb_dir = os.path.join(out_dir, "mb")
     if not os.path.exists(mb_dir):
         os.mkdir(mb_dir)
-    mb_file = os.path.join(mb_dir, "mb_%d_%d_%s_%s_%s_%s.nex" % (num_samples, matrix.ncol, dist_name, i, name_flag, key))
+    mb_file = os.path.join(mb_dir,
+                           "mb_%d_%d_%s_%s_%s_%s.nex" % (num_samples, matrix.ncol, dist_name, i, name_flag, key))
     log_file = mb_file.replace(".nex", ".log")
     create_mrbayes_file(open(mb_file, "w"), log_file, matrix, sample_names, matrix.ncol, n_gen)
     #cmd = [mpi, "-mca", "pml", "ob1", "-mca", "btl", "self,tcp", "-np", procs, mb, os.path.abspath(mb_file)]
@@ -908,11 +912,12 @@ def run_mrbayes(key, i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, d
         for line in open(hostfile):
             hosts.append(line.rstrip())
         random.shuffle(hosts)
-        temp_file = tempfile.NamedTemporaryFile(delete = False)
+        temp_file = tempfile.NamedTemporaryFile(delete=False)
         with temp_file:
             for host in hosts:
                 temp_file.write("%s\n" % host)
-        cmd = [mpi, "-mca", "pml", "ob1", "-mca", "btl", "self,tcp","-np", procs, "--hostfile", temp_file.name, mb, os.path.abspath(mb_file)]
+        cmd = [mpi, "-mca", "pml", "ob1", "-mca", "btl", "self,tcp", "-np", procs, "--hostfile", temp_file.name, mb,
+               os.path.abspath(mb_file)]
         #cmd = [mpi, "-np", procs, "--hostfile", temp_file.name, mb, os.path.abspath(mb_file)]
 
     cmd_string = " ".join([str(elem) for elem in cmd])
@@ -1175,7 +1180,7 @@ def ape_to_dendropy(phylo):
     @rtype: dendropy.Tree
     """
     f = tempfile.NamedTemporaryFile()
-    robjects.r['write.nexus'](phylo, file = f.name)
+    robjects.r['write.nexus'](phylo, file=f.name)
     tree = dendropy.Tree.get_from_path(f.name, "nexus")
     f.close()
     return tree
@@ -1189,7 +1194,7 @@ def dendropy_to_cogent(tree):
     @rtype: cogent.Tree
     """
     assert isinstance(tree, dendropy.Tree)
-    ctree = LoadTree(treestring = tree.as_newick_string())
+    ctree = LoadTree(treestring=tree.as_newick_string())
     return ctree
 
 
@@ -1211,6 +1216,7 @@ def log(text, writer):
     writer.write("%s\n" % text)
     writer.flush()
 
+
 def get_discrete_matrix_from_standardized2(gap, num_states, sample_names):
     """
     creates a binary matrix from a standardized matrix (7 = 11111110) and returns
@@ -1225,7 +1231,7 @@ def get_discrete_matrix_from_standardized2(gap, num_states, sample_names):
     r = robjects.r
     disc = []
     for row in gap:
-        row_string = ''.join([''.join(["1"]*int(elem)).ljust(num_states, "0") for elem in row])
+        row_string = ''.join([''.join(["1"] * int(elem)).ljust(num_states, "0") for elem in row])
         disc.append([int(elem) for elem in row_string])
     disc = numpy.array(disc)
     r_name = _get_random_string(20)
@@ -1290,6 +1296,7 @@ def correlate_matrices(matrix1, matrix2):
         [m2.append(elem) for elem in matrix2.rx(i + 1, True)]
     return stats.pearsonr(numpy.asarray(m1), numpy.asarray(m2))
 
+
 @clockit
 def subsample_abundance_matrix(matrix, perc):
     """
@@ -1297,18 +1304,19 @@ def subsample_abundance_matrix(matrix, perc):
     :param perc: percent of items to keep
     """
     sub = []
-    prob = perc/100.0
+    prob = perc / 100.0
     for i, row in enumerate(matrix):
         pool = []
         for j, col in enumerate(row):
-            pool.extend([j]*int(col))
-        pool_sub=numpy.random.choice(pool, size=len(pool)*prob, replace=False)
+            pool.extend([j] * int(col))
+        pool_sub = numpy.random.choice(pool, size=len(pool) * prob, replace=False)
         hist = _count_unique(pool_sub)
-        row_sub = [0]*len(row)
+        row_sub = [0] * len(row)
         for index, val in izip(hist[0], hist[1]):
             row_sub[index] = val
         sub.append(row_sub)
     return sub
+
 
 def _count_unique(items):
     """

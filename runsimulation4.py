@@ -16,7 +16,7 @@ import sys
 import argparse
 import celery
 from celery import Celery
-from runsimulation4 import * #workaround for celery
+from runsimulation4 import *  #workaround for celery
 import tempfile
 
 numpy2ri.activate()
@@ -143,7 +143,8 @@ def print_ranges(ranges, prefix, num_cols, run, filedata):
             fh.write("%d\t%s\n" % (i, '\t'.join([str(int(elem)) for elem in range[0:2]])))
 
 
-def print_matrices(data, gap, abund, ranges, gap_abund, new_ranges, cont_abund, cont_gap, cont_ranges, sub_abund, sub_abund_ranges, num_cols, tree_num, sample_names, roots, i,
+def print_matrices(data, gap, abund, ranges, gap_abund, new_ranges, cont_abund, cont_gap, cont_ranges, sub_abund,
+                   sub_abund_ranges, num_cols, tree_num, sample_names, roots, i,
                    filedata):
     print_matrix(data, "data", sample_names, num_cols, tree_num, True, roots, i, filedata)
     print_matrix(gap, "gap", sample_names, num_cols, tree_num, True, None, i, filedata)
@@ -157,7 +158,6 @@ def print_matrices(data, gap, abund, ranges, gap_abund, new_ranges, cont_abund, 
     print_ranges(new_ranges, "new_ranges", num_cols, tree_num, filedata)
     print_ranges(cont_ranges, "cont_ranges", num_cols, tree_num, filedata)
     print_ranges(sub_abund_ranges, "sub_ranges", num_cols, tree_num, filedata)
-
 
 
 @clockit
@@ -191,6 +191,7 @@ def print_state_distribution(name_key, data, num_cols, tree_num, sample_names, d
         print s
         dist_file.write("%s\n" % s)
     dist_file.write("\n")
+
 
 def print_sample_trees(r, tree, num_taxa, num_cols, tree_num, filedata):
     assert isinstance(tree, dendropy.Tree)
@@ -309,8 +310,6 @@ def get_column(matrix, i):
     return [row[i] for row in matrix]
 
 
-
-
 def create_abund_pool_from_states(r, data):
     data2 = numpy.ndarray(data.shape)
     for i in xrange(len(data)):
@@ -323,11 +322,11 @@ def create_abund_pool_from_states(r, data):
 
 def run_mr_bayes(key, tree_num, i, disc, sample_names, orig_tree, filedata, mrbayes_timeout):
     mb_tree = app.run_mrbayes(key, str(tree_num) + "-" + str(i), disc,
-        sample_names, disc.ncol,
-        n_gen, mpi,
-        mb, procs,
-        None, filedata['run_dir'],
-        len(sample_names), "d", filedata['hostfile'], mrbayes_timeout)
+                              sample_names, disc.ncol,
+                              n_gen, mpi,
+                              mb, procs,
+                              None, filedata['run_dir'],
+                              len(sample_names), "d", filedata['hostfile'], mrbayes_timeout)
     diffs = app.calculate_differences_r(orig_tree, mb_tree)
     return mb_tree, diffs
 
@@ -395,7 +394,7 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
 
     (u_matrix, u_names), (w_matrix, w_names) = app.calculate_unifrac(abund, sample_names, taxa_tree)
     (u_matrix_norm, u_names_norm), (w_matrix_norm, w_names_norm) = app.calculate_unifrac(abund, sample_names,
-        taxa_tree_fixedbr)
+                                                                                         taxa_tree_fixedbr)
 
     # unifrac tests
     u_pcoa_tree, u_pcoa_diffs = get_unifrac_pcoa(tree, u_matrix, u_names)
@@ -427,30 +426,31 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     cont_disc = app.get_discrete_matrix_from_standardized2(cont_gap, num_states, sample_names)
     mb_tree, mb_diffs = run_mr_bayes("state", tree_num, 0, disc, sample_names, tree, filedata, mrbayes_timeout)
     mb_tree2, mb_diffs2 = run_mr_bayes("sub", tree_num, 0, disc2, sample_names, tree, filedata, mrbayes_timeout)
-    mb_tree_cont, mb_diffs_cont = run_mr_bayes("cont", tree_num, 0, cont_disc, sample_names, tree, filedata, mrbayes_timeout)
+    mb_tree_cont, mb_diffs_cont = run_mr_bayes("cont", tree_num, 0, cont_disc, sample_names, tree, filedata,
+                                               mrbayes_timeout)
 
     # output
     try:
         out_file.write("%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" %
-                   (tree_num, num_cols,
-                    get_tab_string(mb_diffs),
-                    get_tab_string(mb_diffs2),
-                    get_tab_string(mb_diffs_cont),
-                    get_tab_string(u_pcoa_diffs),
-                    get_tab_string(u_cluster_diffs),
-                    get_tab_string(u_nj_diffs),
-                    get_tab_string(w_pcoa_diffs),
-                    get_tab_string(w_cluster_diffs),
-                    get_tab_string(w_nj_diffs),
-                    get_tab_string(u_pcoa_diffs_norm),
-                    get_tab_string(u_cluster_diffs_norm),
-                    get_tab_string(u_nj_diffs_norm),
-                    get_tab_string(w_pcoa_diffs_norm),
-                    get_tab_string(w_cluster_diffs_norm),
-                    get_tab_string(w_nj_diffs_norm),
-                    get_tab_string(bc_pcoa_diffs),
-                    get_tab_string(bc_cluster_diffs),
-                    get_tab_string(bc_nj_diffs)))
+                       (tree_num, num_cols,
+                        get_tab_string(mb_diffs),
+                        get_tab_string(mb_diffs2),
+                        get_tab_string(mb_diffs_cont),
+                        get_tab_string(u_pcoa_diffs),
+                        get_tab_string(u_cluster_diffs),
+                        get_tab_string(u_nj_diffs),
+                        get_tab_string(w_pcoa_diffs),
+                        get_tab_string(w_cluster_diffs),
+                        get_tab_string(w_nj_diffs),
+                        get_tab_string(u_pcoa_diffs_norm),
+                        get_tab_string(u_cluster_diffs_norm),
+                        get_tab_string(u_nj_diffs_norm),
+                        get_tab_string(w_pcoa_diffs_norm),
+                        get_tab_string(w_cluster_diffs_norm),
+                        get_tab_string(w_nj_diffs_norm),
+                        get_tab_string(bc_pcoa_diffs),
+                        get_tab_string(bc_cluster_diffs),
+                        get_tab_string(bc_nj_diffs)))
     except:
         print "Unexpected error in writing output", sys.exc_info()
         sys.exit()
@@ -459,8 +459,8 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
         out_file.close()
         dist_file.close()
 
-    print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, cont_abund, cont_gap, cont_ranges, sub_abund, sub_abund_ranges, num_cols, tree_num, sample_names, roots,
-        0, filedata)
+    print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, cont_abund, cont_gap, cont_ranges,
+                   sub_abund, sub_abund_ranges, num_cols, tree_num, sample_names, roots, 0, filedata)
 
     return (out_file_name, dist_file_name, tree, sample_names, data, gap, abund, abund_ranges,
             gap_from_abund, new_ranges,
@@ -485,24 +485,24 @@ def print_taxa_tree(tree, num_cols, filedata):
 
 
 def get_header():
-    return "tree_num\tcols\t"\
-           "mb_topo\tmb_symm\tmb_path\t"\
-           "mb_topo2\tmb_symm2\tmb_path2\t"\
-           "mb_topo_cont\tmb_symm_cont\tmb_path_cont\t"\
-           "u_pcoa_topo\tu_pcoa_symm\tu_pcoa_path\t"\
-           "u_cluster_topo\tu_cluster_symm\tu_cluster_path\t"\
-           "u_nj_topo\tu_nj_symm\tu_nj_path\t"\
-           "w_pcoa_topo\tw_pcoa_symm\tw_pcoa_path\t"\
-           "w_cluster_topo\tw_cluster_symm\tw_cluster_path\t"\
-           "w_nj_topo\tw_nj_symm\tw_nj_path\t"\
-           "u_pcoa_topo_norm\tu_pcoa_symm_norm\tu_pcoa_path_norm\t"\
-           "u_cluster_topo_norm\tu_cluster_symm_norm\tu_cluster_path_norm\t"\
-           "u_nj_topo_norm\tu_nj_symm_norm\tu_nj_path_norm\t"\
-           "w_pcoa_topo_norm\tw_pcoa_symm_norm\tw_pcoa_path_norm\t"\
-           "w_cluster_topo_norm\tw_cluster_symm_norm\tw_cluster_path_norm\t"\
-           "w_nj_topo_norm\tw_nj_symm_norm\tw_nj_path_norm\t"\
-           "bc_pcoa_topo\tbc_pcoa_symm\tbc_pcoa_path\t"\
-           "bc_cluster_topo\tbc_cluster_symm\tbc_cluster_path\t"\
+    return "tree_num\tcols\t" \
+           "mb_topo\tmb_symm\tmb_path\t" \
+           "mb_topo2\tmb_symm2\tmb_path2\t" \
+           "mb_topo_cont\tmb_symm_cont\tmb_path_cont\t" \
+           "u_pcoa_topo\tu_pcoa_symm\tu_pcoa_path\t" \
+           "u_cluster_topo\tu_cluster_symm\tu_cluster_path\t" \
+           "u_nj_topo\tu_nj_symm\tu_nj_path\t" \
+           "w_pcoa_topo\tw_pcoa_symm\tw_pcoa_path\t" \
+           "w_cluster_topo\tw_cluster_symm\tw_cluster_path\t" \
+           "w_nj_topo\tw_nj_symm\tw_nj_path\t" \
+           "u_pcoa_topo_norm\tu_pcoa_symm_norm\tu_pcoa_path_norm\t" \
+           "u_cluster_topo_norm\tu_cluster_symm_norm\tu_cluster_path_norm\t" \
+           "u_nj_topo_norm\tu_nj_symm_norm\tu_nj_path_norm\t" \
+           "w_pcoa_topo_norm\tw_pcoa_symm_norm\tw_pcoa_path_norm\t" \
+           "w_cluster_topo_norm\tw_cluster_symm_norm\tw_cluster_path_norm\t" \
+           "w_nj_topo_norm\tw_nj_symm_norm\tw_nj_path_norm\t" \
+           "bc_pcoa_topo\tbc_pcoa_symm\tbc_pcoa_path\t" \
+           "bc_cluster_topo\tbc_cluster_symm\tbc_cluster_path\t" \
            "bc_nj_topo\tbc_nj_symm\tbc_nj_path"
 
 
@@ -575,6 +575,7 @@ def create_uniform_brlen_tree(taxa_tree, brlen):
     r('%s$edge.length = rep(%f, length(%s$edge.length))' % (temp_name, brlen, temp_name))
     return app.ape_to_dendropy(r[temp_name])
 
+
 def write_file_data(filedata):
     f = os.path.join(filedata['project_dir'], 'params.log')
     with open(f, "w") as out:
@@ -587,7 +588,7 @@ def main():
     args = get_args()
     filedata = create_file_data(args)
     write_file_data(filedata)
-#    sys.stdout = open(os.path.basename("%s_stdout.txt" % args.project_dir), "w")
+    #    sys.stdout = open(os.path.basename("%s_stdout.txt" % args.project_dir), "w")
     sample_trees = get_trees(args.tree_file, filedata['out_dir'])
     out_file = open(os.path.join(filedata['out_dir'], "out.txt"), "w", 0)
     out_file.write("%s\n" % get_header())
@@ -603,16 +604,16 @@ def main():
         if filedata['celery']:
             print tree_num
             res = run_simulation.delay(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, None, None,
-                args.abundance_from_states,
-                filedata, args.brlen, args.mrbayes_timeout)
+                                       args.abundance_from_states,
+                                       filedata, args.brlen, args.mrbayes_timeout)
             celery_results.append(res)
             submit_count += 1
             if submit_count == 1:
                 break
         else:
             run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, out_file, dist_file,
-                args.abundance_from_states,
-                filedata, args.brlen, args.mrbayes_timeout)
+                           args.abundance_from_states,
+                           filedata, args.brlen, args.mrbayes_timeout)
             if tree_num == 0:
                 break
 
@@ -633,6 +634,7 @@ def main():
     out_file.close()
     dist_file.close()
     filedata['range_fh'].close()
+
 
 if __name__ == '__main__':
     main()
