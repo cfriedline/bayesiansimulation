@@ -627,6 +627,19 @@ def run_full_simulation(sample_trees, filedata, args, taxa_tree, taxa_tree_fixed
     filedata['range_fh'].close()
 
 
+def run_bm_sigma_simulation():
+    pass
+
+
+def run_rate_simulation():
+    pass
+
+
+def run_subsample_simulation():
+    pass
+
+
+
 @clockit
 def main():
     args = get_args()
@@ -645,13 +658,13 @@ def main():
         run_full_simulation(sample_trees, filedata, args, taxa_tree, taxa_tree_fixedbr, col, out_file, dist_file)
 
     if 'bm_sigma' in args.task:
-        pass
+        run_bm_sigma_simulation()
 
     if 'rate' in args.task:
-        pass
+        run_rate_simulation()
 
     if 'subsample' in args.task:
-        pass
+        run_subsample_simulation()
 
 
 if __name__ == '__main__':
