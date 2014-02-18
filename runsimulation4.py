@@ -156,7 +156,7 @@ def print_matrices(data, gap, abund, ranges, gap_abund, new_ranges, cont_abund, 
 
 
 @clockit
-def print_state_distribution(data, num_cols, tree_num, sample_names, dist_file):
+def print_state_distribution(name_key, data, num_cols, tree_num, sample_names, dist_file):
     counts = [None] * len(data)
     for i, row in enumerate(data):
         rowdata = {}
@@ -175,7 +175,7 @@ def print_state_distribution(data, num_cols, tree_num, sample_names, dist_file):
     keys = list(keys)
     keys.sort()
 
-    dist_file.write("%d, %d\n" % (num_cols, tree_num))
+    dist_file.write("%d, %d, %s\n" % (num_cols, tree_num, name_key))
     for i, d in enumerate(counts):
         s = sample_names[i]
         for key in keys:
@@ -365,7 +365,7 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     roots = list(r['roots'])
     sample_names = numpy.asarray(r('rownames(data)'))
     print_sample_trees(r, tree, num_taxa, num_cols, tree_num, filedata)
-    print_state_distribution(data, num_cols, tree_num, sample_names, dist_file)
+    print_state_distribution("state", data, num_cols, tree_num, sample_names, dist_file)
     gap = None
     if not abundance_from_states:
         ranges = get_column_ranges(data)
@@ -383,6 +383,7 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     cont_abund = app.get_continuous_abundance_matrix(r)
     cont_ranges = get_column_ranges(numpy.array(cont_abund))
     cont_gap = app.restandardize_matrix(cont_abund, cont_ranges, num_states)
+    print_state_distribution("cont", cont_gap, num_cols, tree_num, sample_names, dist_file)
 
     (u_matrix, u_names), (w_matrix, w_names) = app.calculate_unifrac(abund, sample_names, taxa_tree)
     (u_matrix_norm, u_names_norm), (w_matrix_norm, w_names_norm) = app.calculate_unifrac(abund, sample_names,
