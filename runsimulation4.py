@@ -424,6 +424,10 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     disc = app.get_discrete_matrix_from_standardized(gap_from_abund, bits, sample_names)
     disc2 = app.get_discrete_matrix_from_standardized2(gap_from_sub, num_states, sample_names)
     cont_disc = app.get_discrete_matrix_from_standardized2(cont_gap, num_states, sample_names)
+
+    print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, cont_abund, cont_gap, cont_ranges,
+                   sub_abund, sub_abund_ranges, num_cols, tree_num, sample_names, roots, 0, filedata)
+
     mb_tree, mb_diffs = run_mr_bayes("state", tree_num, 0, disc, sample_names, tree, filedata, mrbayes_timeout)
     mb_tree2, mb_diffs2 = run_mr_bayes("sub", tree_num, 0, disc2, sample_names, tree, filedata, mrbayes_timeout)
     mb_tree_cont, mb_diffs_cont = run_mr_bayes("cont", tree_num, 0, cont_disc, sample_names, tree, filedata,
@@ -458,9 +462,6 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     if is_celery:
         out_file.close()
         dist_file.close()
-
-    print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, cont_abund, cont_gap, cont_ranges,
-                   sub_abund, sub_abund_ranges, num_cols, tree_num, sample_names, roots, 0, filedata)
 
     return (out_file_name, dist_file_name, tree, sample_names, data, gap, abund, abund_ranges,
             gap_from_abund, new_ranges,
