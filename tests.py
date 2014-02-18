@@ -4,6 +4,8 @@ __author__ = 'chris'
 
 import unittest
 import app
+import runsimulation4 as sim
+import numpy
 
 class Tester(unittest.TestCase):
     def setUp(self):
@@ -11,6 +13,13 @@ class Tester(unittest.TestCase):
         self.t2 = [0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0]
         self.mb = {"321": "/Users/chris/src/mrbayes_3.2.1/src/mb",
                    "322" :"/Users/chris/src/mrbayes_3.2.2/src/mb"}
+
+    def test_restandardize(self):
+        abund = [[0,0],[0,100]]
+        num_states = 8
+        ranges = sim.get_column_ranges(numpy.array(abund))
+        gap = app.restandardize_matrix(abund, ranges, num_states)
+        assert gap == [[0,0],[0,num_states-1]]
 
     def test_paralin(self):
         # Test per Lake (1994)

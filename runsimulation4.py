@@ -143,7 +143,7 @@ def print_ranges(ranges, prefix, num_cols, run, filedata):
             fh.write("%d\t%s\n" % (i, '\t'.join([str(int(elem)) for elem in range[0:2]])))
 
 
-def print_matrices(data, gap, abund, ranges, gap_abund, new_ranges, cont_abund, cont_gap, num_cols, tree_num, sample_names, roots, i,
+def print_matrices(data, gap, abund, ranges, gap_abund, new_ranges, cont_abund, cont_gap, cont_ranges, sub_abund, sub_abund_ranges, num_cols, tree_num, sample_names, roots, i,
                    filedata):
     print_matrix(data, "data", sample_names, num_cols, tree_num, True, roots, i, filedata)
     print_matrix(gap, "gap", sample_names, num_cols, tree_num, True, None, i, filedata)
@@ -151,8 +151,13 @@ def print_matrices(data, gap, abund, ranges, gap_abund, new_ranges, cont_abund, 
     print_matrix(gap_abund, "gap_abund", sample_names, num_cols, tree_num, True, None, i, filedata)
     print_matrix(cont_abund, "cont_abund", sample_names, num_cols, tree_num, True, None, i, filedata)
     print_matrix(cont_gap, "cont_gap", sample_names, num_cols, tree_num, True, None, i, filedata)
+    print_matrix(sub_abund, "sub_abund", sample_names, num_cols, tree_num, True, None, i, filedata)
+
     print_ranges(ranges, "ranges", num_cols, tree_num, filedata)
     print_ranges(new_ranges, "new_ranges", num_cols, tree_num, filedata)
+    print_ranges(cont_ranges, "cont_ranges", num_cols, tree_num, filedata)
+    print_ranges(sub_abund_ranges, "sub_ranges", num_cols, tree_num, filedata)
+
 
 
 @clockit
@@ -454,7 +459,7 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
         out_file.close()
         dist_file.close()
 
-    print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, cont_abund, cont_gap, num_cols, tree_num, sample_names, roots,
+    print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, cont_abund, cont_gap, cont_ranges, sub_abund, sub_abund_ranges, num_cols, tree_num, sample_names, roots,
         0, filedata)
 
     return (out_file_name, dist_file_name, tree, sample_names, data, gap, abund, abund_ranges,
@@ -602,7 +607,7 @@ def main():
                 filedata, args.brlen, args.mrbayes_timeout)
             celery_results.append(res)
             submit_count += 1
-            if submit_count == 8:
+            if submit_count == 1:
                 break
         else:
             run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, out_file, dist_file,
