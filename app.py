@@ -820,7 +820,7 @@ def output_matrix(data, folder, file_name, is_r):
                 f.write(line + '\n')
 
 
-def create_mrbayes_file(file, matrix, sample_names, num_cols, n_gen):
+def create_mrbayes_file(file, log_file, matrix, sample_names, num_cols, n_gen):
     print "Creating MrBayes file"
     file.write("#NEXUS\n\n")
     file.write("BEGIN DATA;\n")
@@ -836,7 +836,7 @@ def create_mrbayes_file(file, matrix, sample_names, num_cols, n_gen):
     file.write("END;\n\n")
 
     file.write("begin mrbayes;\n")
-    file.write("log start filename=%s replace;\n" % os.path.join(os.path.dirname(file.name), "mb_%s.log" % _get_random_string(10)))
+    file.write("log start filename=%s replace;\n" % os.path.join(os.path.dirname(file.name), log_file))
     file.write("set autoclose=yes nowarn=yes;\n")
     file.write("lset rates=equal coding=all;\n")
     #file.write("mcmcp checkpoint=yes;\n")
@@ -872,7 +872,7 @@ def _run_mrbayes_cmd(cmd_string, timeout):
 
 
 @clockit
-def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, out_dir, num_samples, name_flag,
+def run_mrbayes(key, i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, out_dir, num_samples, name_flag,
                 hostfile, timeout):
     """
     Function to run mrbayes and return a tree
@@ -896,9 +896,9 @@ def run_mrbayes(i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, dist, 
     mb_dir = os.path.join(out_dir, "mb")
     if not os.path.exists(mb_dir):
         os.mkdir(mb_dir)
-    mb_file = os.path.join(mb_dir, "mb_%d_%d_%s_%s_%s.nex" % (num_samples, matrix.ncol, dist_name, i, name_flag))
-
-    create_mrbayes_file(open(mb_file, "w"), matrix, sample_names, matrix.ncol, n_gen)
+    mb_file = os.path.join(mb_dir, "mb_%d_%d_%s_%s_%s_%s.nex" % (num_samples, matrix.ncol, dist_name, i, name_flag, key))
+    log_file = mb_file.replace(".nex", ".log")
+    create_mrbayes_file(open(mb_file, "w"), log_file, matrix, sample_names, matrix.ncol, n_gen)
     #cmd = [mpi, "-mca", "pml", "ob1", "-mca", "btl", "self,tcp", "-np", procs, mb, os.path.abspath(mb_file)]
     cmd = [mpi, "-np", procs, mb, os.path.abspath(mb_file)]
 

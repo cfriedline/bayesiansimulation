@@ -94,8 +94,8 @@ def create_R():
     """)
 
     r("""
-        get_continuous_matrix = function(cols) {
-            r = rgamma(1, shape=1000, rate=1)
+        get_continuous_matrix = function(cols, shape, scale) {
+            r = rgamma(1, shape=shape, scale=scale)
             m = replicate(cols, rTraitCont(tree, ancestor=F, sigma=r*0.5, root=r))
             m = round(as.matrix(m))
             return(list(m, r))
@@ -221,7 +221,7 @@ def get_tab_string(tuple):
 def store_valid_matrix_data(r, taxa_tree, num_cols, num_states, rate):
     print "Storing valid matrix data in R session"
     r('matrix_data = get_valid_matrix(%d, %d, %f)' % (num_cols, num_states, rate))
-    r('cont_matrix_data = get_continuous_matrix(%d)' % num_cols)
+    r('cont_matrix_data = get_continuous_matrix(%d, %f, %f)' % (num_cols, gamma_shape, gamma_scale))
     r('data = matrix_data[[1]]')
     r('roots = matrix_data[[2]]')
     r('data_cont = cont_matrix_data[[1]]')
@@ -316,8 +316,8 @@ def create_abund_pool_from_states(r, data):
     return abund_pool, data2
 
 
-def run_mr_bayes(tree_num, i, disc, sample_names, orig_tree, filedata, mrbayes_timeout):
-    mb_tree = app.run_mrbayes(str(tree_num) + "-" + str(i), disc,
+def run_mr_bayes(key, tree_num, i, disc, sample_names, orig_tree, filedata, mrbayes_timeout):
+    mb_tree = app.run_mrbayes(key, str(tree_num) + "-" + str(i), disc,
         sample_names, disc.ncol,
         n_gen, mpi,
         mb, procs,
@@ -416,9 +416,9 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     disc = app.get_discrete_matrix_from_standardized(gap_from_abund, bits, sample_names)
     disc2 = app.get_discrete_matrix_from_standardized2(gap_from_abund, num_states, sample_names)
     cont_disc = app.get_discrete_matrix_from_standardized2(cont_gap, num_states, sample_names)
-    mb_tree, mb_diffs = run_mr_bayes(tree_num, 0, disc, sample_names, tree, filedata, mrbayes_timeout)
-    mb_tree2, mb_diffs2 = run_mr_bayes(tree_num, 0, disc2, sample_names, tree, filedata, mrbayes_timeout)
-    mb_tree_cont, mb_diffs_cont = run_mr_bayes(tree_num, 0, cont_disc, sample_names, tree, filedata, mrbayes_timeout)
+    mb_tree, mb_diffs = run_mr_bayes("state", tree_num, 0, disc, sample_names, tree, filedata, mrbayes_timeout)
+    mb_tree2, mb_diffs2 = run_mr_bayes("sub", tree_num, 0, disc2, sample_names, tree, filedata, mrbayes_timeout)
+    mb_tree_cont, mb_diffs_cont = run_mr_bayes("cont", tree_num, 0, cont_disc, sample_names, tree, filedata, mrbayes_timeout)
 
     # output
     try:
@@ -604,7 +604,7 @@ def main():
             run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, out_file, dist_file,
                 args.abundance_from_states,
                 filedata, args.brlen, args.mrbayes_timeout)
-            if tree_num == 3:
+            if tree_num == 0:
                 break
 
     if filedata['celery']:
