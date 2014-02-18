@@ -39,6 +39,7 @@ bits = 3
 rate = 1.0
 gamma_shape = 1
 gamma_scale = 1000
+sigma = 0.5  #for BM
 
 if 'godel' in hostname:
     mpi = '/usr/global/openmpi-1.5.3-w-psm/bin/mpirun'
@@ -94,7 +95,7 @@ def create_R():
     """)
 
     r("""
-        get_continuous_matrix = function(cols, shape, scale) {
+        get_continuous_matrix = function(cols, shape, scale, sigma) {
             r = rgamma(1, shape=shape, scale=scale)
             m = replicate(cols, rTraitCont(tree, ancestor=F, sigma=r*0.5, root=r))
             m = round(as.matrix(m))
@@ -227,7 +228,7 @@ def get_tab_string(tuple):
 def store_valid_matrix_data(r, taxa_tree, num_cols, num_states, rate):
     print "Storing valid matrix data in R session"
     r('matrix_data = get_valid_matrix(%d, %d, %f)' % (num_cols, num_states, rate))
-    r('cont_matrix_data = get_continuous_matrix(%d, %f, %f)' % (num_cols, gamma_shape, gamma_scale))
+    r('cont_matrix_data = get_continuous_matrix(%d, %f, %f, %f)' % (num_cols, gamma_shape, gamma_scale, sigma))
     r('data = matrix_data[[1]]')
     r('roots = matrix_data[[2]]')
     r('data_cont = cont_matrix_data[[1]]')
@@ -517,6 +518,8 @@ def get_args():
     p.add_argument('--mrbayes_timeout', help="timeout for mrbayes instance", type=float)
     p.add_argument('--rate', help="rate to simulate matrix", type=float, default=1.0)
     p.add_argument('--celery', help="use celery parallelism", action='store_true')
+    p.add_argument('--task', help="the task to run", choices=['full', 'bm_sigma', 'rate', 'subsample'], required=True,
+                   action='append')
 
     args = p.parse_args()
 
@@ -584,20 +587,7 @@ def write_file_data(filedata):
             out.write("%s: %s\n" % (k, v))
 
 
-@clockit
-def main():
-    args = get_args()
-    filedata = create_file_data(args)
-    write_file_data(filedata)
-    #    sys.stdout = open(os.path.basename("%s_stdout.txt" % args.project_dir), "w")
-    sample_trees = get_trees(args.tree_file, filedata['out_dir'])
-    out_file = open(os.path.join(filedata['out_dir'], "out.txt"), "w", 0)
-    out_file.write("%s\n" % get_header())
-    dist_file = open(os.path.join(filedata['out_dir'], "dists.txt"), "w", 0)
-    col = args.cols
-    taxa_tree = app.create_tree(col, "T")
-    taxa_tree_fixedbr = create_uniform_brlen_tree(taxa_tree, 0.5)
-    print_taxa_tree(taxa_tree, col, filedata)
+def run_full_simulation(sample_trees, filedata, args, taxa_tree, taxa_tree_fixedbr, col, out_file, dist_file):
     submit_count = 0
     celery_results = []
     for tree_num, sample_tree in enumerate(sample_trees):
@@ -635,6 +625,33 @@ def main():
     out_file.close()
     dist_file.close()
     filedata['range_fh'].close()
+
+
+@clockit
+def main():
+    args = get_args()
+    filedata = create_file_data(args)
+    write_file_data(filedata)
+    #    sys.stdout = open(os.path.basename("%s_stdout.txt" % args.project_dir), "w")
+    sample_trees = get_trees(args.tree_file, filedata['out_dir'])
+    out_file = open(os.path.join(filedata['out_dir'], "out.txt"), "w", 0)
+    out_file.write("%s\n" % get_header())
+    dist_file = open(os.path.join(filedata['out_dir'], "dists.txt"), "w", 0)
+    col = args.cols
+    taxa_tree = app.create_tree(col, "T")
+    taxa_tree_fixedbr = create_uniform_brlen_tree(taxa_tree, 0.5)
+    print_taxa_tree(taxa_tree, col, filedata)
+    if 'full' in args.task:
+        run_full_simulation(sample_trees, filedata, args, taxa_tree, taxa_tree_fixedbr, col, out_file, dist_file)
+
+    if 'bm_sigma' in args.task:
+        pass
+
+    if 'rate' in args.task:
+        pass
+
+    if 'subsample' in args.task:
+        pass
 
 
 if __name__ == '__main__':
