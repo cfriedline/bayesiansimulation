@@ -378,6 +378,9 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
 
     abund = app.get_abundance_matrix(gap, abund_ranges, "gamma", num_states)
     sub_abund = app.subsample_abundance_matrix(abund, 10)
+    sub_abund_ranges = get_column_ranges(numpy.array(sub_abund))
+    gap_from_sub = app.restandardize_matrix(sub_abund, sub_abund_ranges, num_states)
+    print_state_distribution("sub", gap_from_sub, num_cols, tree_num, sample_names, dist_file)
 
     #continus matrix to gap to discrete matrix
     cont_abund = app.get_continuous_abundance_matrix(r)
@@ -415,7 +418,7 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     new_ranges = get_column_ranges(numpy.array(abund))
     gap_from_abund = app.restandardize_matrix(abund, new_ranges, num_states)
     disc = app.get_discrete_matrix_from_standardized(gap_from_abund, bits, sample_names)
-    disc2 = app.get_discrete_matrix_from_standardized2(gap_from_abund, num_states, sample_names)
+    disc2 = app.get_discrete_matrix_from_standardized2(gap_from_sub, num_states, sample_names)
     cont_disc = app.get_discrete_matrix_from_standardized2(cont_gap, num_states, sample_names)
     mb_tree, mb_diffs = run_mr_bayes("state", tree_num, 0, disc, sample_names, tree, filedata, mrbayes_timeout)
     mb_tree2, mb_diffs2 = run_mr_bayes("sub", tree_num, 0, disc2, sample_names, tree, filedata, mrbayes_timeout)
