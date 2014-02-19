@@ -373,6 +373,7 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     print_state_distribution("state", data, num_cols, tree_num, sample_names, dist_file)
     gap = None
     if not abundance_from_states:
+        print "not abundance from states!"
         ranges = get_column_ranges(data)
         data, ranges = curate_data_matrix(r, data, ranges)
         gap = app.restandardize_matrix(data, ranges, num_states)
@@ -599,7 +600,7 @@ def run_full_simulation(sample_trees, filedata, args, taxa_tree, taxa_tree_fixed
                                        filedata, args.brlen, args.mrbayes_timeout)
             celery_results.append(res)
             submit_count += 1
-            if submit_count == 1:
+            if submit_count == 8:
                 break
         else:
             run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, out_file, dist_file,
@@ -637,7 +638,6 @@ def run_rate_simulation():
 
 def run_subsample_simulation():
     pass
-
 
 
 @clockit

@@ -725,7 +725,7 @@ def restandardize_matrix(abund, ranges, num_states):
         for j, val in enumerate(row):
             range = ranges[j]
             if range[0] == range[1] and range[0] > 0:
-                raise Exception("dupe range found at row %d %s" % (i, range), [row[j] for row in abund])
+                raise Exception("dupe range found at row/col %d/%d %s" % (i, j, range), [row[j] for row in abund])
             if range[1] > 0:
                 data[i][j] = compute_weight(num_states, abund=val, max=range[1], min=range[0])
             else:
