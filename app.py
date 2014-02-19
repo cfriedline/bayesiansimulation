@@ -871,6 +871,8 @@ def _run_mrbayes_cmd(cmd_string, timeout):
 
     stdout, stderr = p.communicate()
     if p.returncode != 0:
+        logger.warn(stdout)
+        logger.warn(stderr)
         logger.warn("MrBayes timeout, killing on %s!" % platform.uname()[1])
         if timeout:
             timer.cancel()
