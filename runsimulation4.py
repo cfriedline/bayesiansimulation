@@ -294,16 +294,16 @@ def get_abundance_ranges(r, gap, num_states):
         ranges.append(app.get_random_min_and_max_from_gamma(gamma_shape, gamma_scale, app.compute_smallest_max()))
 
     for i, range in enumerate(ranges):
-        for i in xrange(num_states):
+        for j in xrange(num_states):
             range[2].append([-1] * 2)
         r("range=matrix(%d:%d)" % (range[0], range[1]))
         r('weights=apply(range, 2, gapweight, min=min(range), max=max(range), states=%d)' % num_states)
         weights = r('table(weights)')
-        min = range[0]
-        for i, count in enumerate(weights):
-            range[2][i][0] = min
-            range[2][i][1] = min + count - 1
-            min += count
+        min_val = range[0]
+        for j, count in enumerate(weights):
+            range[2][j][0] = min_val
+            range[2][j][1] = min_val + count - 1
+            min_val += count
     return ranges
 
 
