@@ -68,7 +68,7 @@ def create_R():
 
     r("""
         gapweight = function(x, min, max, states) {
-	        return(round(((x-min)*(states-1))/(max-min)))
+            return(round(((x-min)*(states-1))/(max-min)))
         }
     """)
 
