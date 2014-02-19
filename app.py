@@ -51,7 +51,6 @@ def clockit(func):
         retval = func(*args, **kw)
         t.stop()
         output = '\t%s in %s' % (func.__name__, t)
-        #print output
         logger.info(output)
         if log_file is not None:
             log_file.write("%s\n" % output)
@@ -310,7 +309,7 @@ def _get_valid_triplets(num_samples, num_triplets, bits, q):
 
 def _generate_candiate_free_discrete_matrix(sample_tree, usable_cols):
     assert isinstance(sample_tree, dendropy.Tree)
-    print "Creating discrete triplet character matrix"
+    logger.info("Creating discrete triplet character matrix")
     r = robjects.r
     treename = _get_random_string(10)
     matrixname = _get_random_string(10)
@@ -326,7 +325,7 @@ def _generate_candiate_free_discrete_matrix(sample_tree, usable_cols):
 
 def _generate_candidate_triplet_discrete_matrix(num_cols, num_samples, sample_tree, bits, usable_cols):
     assert isinstance(sample_tree, dendropy.Tree)
-    print "Creating discrete triplet character matrix"
+    logger.info("Creating discrete triplet character matrix")
     r = robjects.r
     newick = sample_tree.as_newick_string()
     num_samples = len(sample_tree.leaf_nodes())
@@ -426,7 +425,7 @@ def create_tree(num_tips, type):
     @rtype: dendropy.Tree
     """
     r = robjects.r
-    print "Creating %s tree in %s" % (type, __name__)
+    logger.info("Creating %s tree in %s" % (type, __name__))
     robjects.globalenv['numtips'] = num_tips
     robjects.globalenv['treetype'] = type
     if type == "T":
@@ -577,7 +576,7 @@ def get_range_standardized_matrix_from_discrete(matrix, bits, num_cols):
     @return: a new matrix of proper usable length given by bits used
     @rtype: numpy.ndarray
     """
-    print "Getting gap-weighted matrix"
+    logger.info("Getting gap-weighted matrix")
     gap = []
     assert isinstance(matrix, rpy2.robjects.vectors.Matrix)
     for rownum in xrange(matrix.nrow):
@@ -687,7 +686,7 @@ def get_abundance_matrix(gap, ranges, dist, num_states):
     @return: a two dimensional list
     @rtype: list
     """
-    print "Getting %s abundance matrix" % dist
+    logger.info("Getting %s abundance matrix" % dist)
     data = []
     col_min = [False] * len(gap[0])  # stores whether min has been found for a col
     col_max = [False] * len(gap[0])  # stores whether max has been found for a col
@@ -722,7 +721,7 @@ def restandardize_matrix(abund, ranges, num_states):
     @raise:
     @rtype: list
     """
-    print "Restandardizing abundance matrix"
+    logger.info("Restandardizing abundance matrix")
     data = [None] * len(abund)
     #    ranges = _get_range_for_columns(abund)
     for i, row in enumerate(abund):
@@ -757,7 +756,7 @@ def get_unifrac_cluster(matrix, rownames):
     rows = name + "rownames"
     clust = name + "clust"
     phylo = name + "phylo"
-    print name, rows, clust, phylo
+    logger.info(name, rows, clust, phylo)
     r = robjects.r
     assert isinstance(matrix, numpy.ndarray)
     nr, nc = matrix.shape
@@ -765,10 +764,10 @@ def get_unifrac_cluster(matrix, rownames):
     matrix_r = r.matrix(matrix_vec, nrow=nr, ncol=nc)
     robjects.globalenv[name] = matrix_r
     robjects.globalenv[rows] = rownames
-    print r[name]
+    logger.info(r[name])
     r("rownames(%s) = %s" % (name, rows))
-    print matrix
-    print r[name]
+    logger.info(matrix)
+    logger.info(r[name])
     r("%s = hclust(%s, method='average')" % (clust, name))
     r("%s = as.phylo(%s)" % (phylo, clust))
     tree = r('multi2di(%s)' % phylo)
@@ -828,7 +827,7 @@ def output_matrix(data, folder, file_name, is_r):
 
 
 def create_mrbayes_file(file, log_file, matrix, sample_names, num_cols, n_gen):
-    print "Creating MrBayes file"
+    logger.info("Creating MrBayes file")
     file.write("#NEXUS\n\n")
     file.write("BEGIN DATA;\n")
     file.write("DIMENSIONS NTAX=%d NCHAR=%d;\n" % (matrix.nrow, num_cols))
@@ -866,7 +865,7 @@ def _run_mrbayes_cmd(cmd_string, timeout):
 
     stdout, stderr = p.communicate()
     if p.returncode != 0:
-        print "MrBayes timeout, killing on %s!" % platform.uname()[1]
+        logger.warn("MrBayes timeout, killing on %s!" % platform.uname()[1])
         if timeout:
             timer.cancel()
         return _run_mrbayes_cmd(cmd_string, timeout)
@@ -876,7 +875,7 @@ def _run_mrbayes_cmd(cmd_string, timeout):
 
 
 #    for line in iter(p.stdout.readline, ''):
-#        print line.rstrip()
+#        logger.info(line.rstrip())
 #
 
 
@@ -898,7 +897,7 @@ def run_mrbayes(key, i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, d
     @rtype: dendropy.Tree
     """
     assert isinstance(matrix, robjects.Matrix)
-    print "Running MrBayes"
+    logger.info("Running MrBayes")
     dist_name = "n"
     if dist == "gamma":
         dist_name = "g"
@@ -927,7 +926,7 @@ def run_mrbayes(key, i, matrix, sample_names, num_cols, n_gen, mpi, mb, procs, d
         #cmd = [mpi, "-np", procs, "--hostfile", temp_file.name, mb, os.path.abspath(mb_file)]
 
     cmd_string = " ".join([str(elem) for elem in cmd])
-    print cmd_string
+    logger.info(cmd_string)
 
     _run_mrbayes_cmd(cmd_string, timeout)
 
@@ -1218,7 +1217,7 @@ def log(text, writer):
     @param writer: a file object
     """
     assert isinstance(writer, file)
-    print text
+    logger.info(text)
     writer.write("%s\n" % text)
     writer.flush()
 
@@ -1233,7 +1232,7 @@ def get_discrete_matrix_from_standardized2(gap, num_states, sample_names):
     @return: the rpy2 Matrix
     @rtype: robjects.Matrix
     """
-    print "Creating new discrete matrix"
+    logger.info("Creating new discrete matrix")
     r = robjects.r
     disc = []
     for row in gap:
@@ -1257,7 +1256,7 @@ def get_discrete_matrix_from_standardized(gap, bits, sample_names):
     @return: the rpy2 Matrix
     @rtype: robjects.Matrix
     """
-    print "Creating new discrete matrix"
+    logger.info("Creating new discrete matrix")
     r = robjects.r
     disc = []
     for row in gap:
