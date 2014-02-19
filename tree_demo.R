@@ -1,7 +1,7 @@
 get_matrix = function(cols, numstates, rate, model) {
     found = 0
     while (found < cols) {
-        root = sample(numstates)[1]
+        root = sample(numstates, size=1)
         temp = rTraitDisc(tree, model=model, 
                           k=numstates, states=1:numstates, 
                           rate=rate, root.value=root,
@@ -17,24 +17,43 @@ get_matrix = function(cols, numstates, rate, model) {
             }
             found = found + 1
         }
-    }?
+    }
     return(list(m, roots))
 }
 
-get_step_model = function(num_states) {
+get_state_model = function(num_states) {
     mat=matrix(seq(1:num_states**2),num_states)
     for (i in 1:num_states) {
         for (j in 1:num_states) {
             mat[i,j] = abs(i-j)
         }
     }
+    print(mat)
     return(mat)
 }
 
+step_func = function(x, l) {
+    probs = rep(1, num_states)
+    m = matrix(1:num_states,1)
+    for (i in 1:ncol(m)) {
+        diff=abs(x-i)
+        if (diff==0) {
+            m[1,i] = 0
+        } else {
+            m[1,i] = (1/num_states)/diff
+        }        
+    }
+    m[1,x] = 1-sum(m)
+    print(paste("ancestor =",x))
+    print(m)
+    return(sample(num_states, size=1, prob=probs))
+}
+    
 
 get_continuous_matrix = function(cols) {
     r = round(rgamma(1, shape=1000, rate=1))
-    m = replicate(cols, rTraitCont(tree, ancestor=T, sigma=r*0.5, root.value=r))
+    r = sample(100, size=1)
+    m = replicate(cols, rTraitCont(tree, ancestor=T, sigma=r*100, root.value=r))
     m = round(as.matrix(m))
     return(list(m, r))
 }
@@ -45,15 +64,17 @@ rate = 1
 tree =  rtree(num_states)
 data_er = get_matrix(cols, num_states, rate, "ER")
 data_cont = get_continuous_matrix(cols)
-data_step = get_matrix(cols, num_states, rate, get_step_model(num_states))
+data_step = get_matrix(cols, num_states, rate, get_state_model(num_states))
+data_w = get_matrix(cols, num_states, rate, step_func)
 x_er = data_er[[1]]
 x_cont = data_cont[[1]]
 x_cont = ifelse(x_cont<0, 0, x_cont)
 x_step = data_step[[1]]
+x_w = data_w[[1]]
 
-pdf("./tree_demo.pdf", height=8.5, width=20)
+#pdf("./tree_demo.pdf", height=8.5, width=20)
 
-par(mfrow=c(1,3))
+par(mfrow=c(2,2))
 plot(tree, show.tip.label=F)
 labels = x_er
 title(paste("ER, root=", data_er[[2]], sep=""))
@@ -77,4 +98,14 @@ Y <- labels[1:num_states]
 A <- labels[-(1:num_states)]
 nodelabels(A)
 tiplabels(Y)    
-dev.off()
+
+plot(tree, show.tip.label=F)
+labels = x_w
+title(paste("W, root=", data_step[[2]], sep=""))
+Y <- labels[1:num_states]
+A <- labels[-(1:num_states)]
+nodelabels(A)
+tiplabels(Y)    
+
+
+#dev.off()

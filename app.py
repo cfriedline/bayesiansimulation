@@ -669,10 +669,16 @@ def get_random_abundance(weight, col_range):
     return round(rand)
 
 
-@clockit
 def get_continuous_abundance_matrix(r):
     return numpy.array(r('data_cont')).tolist()
 
+
+def get_sym_state_abundance_matrix(r):
+    return numpy.array(r('data_sym_state')).tolist()
+
+
+def get_sym_step_abundance_matrix(r):
+    return numpy.array(r('data_sym_step')).tolist()
 
 @clockit
 def get_abundance_matrix(gap, ranges, dist, num_states):
@@ -1332,3 +1338,5 @@ def _count_unique(items):
     uniq_keys = numpy.unique(items)
     bins = uniq_keys.searchsorted(items)
     return uniq_keys, numpy.bincount(bins)
+
+
