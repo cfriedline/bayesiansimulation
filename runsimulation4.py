@@ -19,6 +19,7 @@ from celery import Celery
 from runsimulation4 import *  #workaround for celery
 import tempfile
 import logging
+import billiard.exceptions
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -694,18 +695,21 @@ def run_full_simulation(sample_trees, filedata, args, taxa_tree, taxa_tree_fixed
 
     if filedata['celery']:
         for i, res in enumerate(celery_results):
-            res = res.get()
-            logger.info("getting results for task %d" % i)
-            o = open(res[0])
-            d = open(res[1])
-            for line in o:
-                out_file.write("%s" % line)
-            for line in d:
-                dist_file.write("%s" % line)
-            o.close()
-            d.close()
-            os.unlink(res[0])
-            os.unlink(res[1])
+            try:
+                res = res.get()
+                logger.info("getting results for task %d" % i)
+                o = open(res[0])
+                d = open(res[1])
+                for line in o:
+                    out_file.write("%s" % line)
+                for line in d:
+                    dist_file.write("%s" % line)
+                o.close()
+                d.close()
+                os.unlink(res[0])
+                os.unlink(res[1])
+            except billiard.exceptions.WorkerLostError as e:
+                logger.error(e)
     out_file.close()
     dist_file.close()
     filedata['range_fh'].close()
