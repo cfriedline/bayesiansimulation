@@ -28,7 +28,7 @@ get_state_model = function(num_states) {
             mat[i,j] = abs(i-j)
         }
     }
-    print(mat)
+    #print(mat)
     return(mat)
 }
 
@@ -44,8 +44,8 @@ step_func = function(x, l) {
         }        
     }
     m[1,x] = 1-sum(m)
-    print(paste("ancestor =",x))
-    print(m)
+    #print(paste("ancestor =",x))
+    #print(m)
     return(sample(num_states, size=1, prob=probs))
 }
     
@@ -62,50 +62,29 @@ num_states = 8
 cols = 1
 rate = 1
 tree =  rtree(num_states)
+tree$edge.length = rep(0.5, length(tree$edge.length))
 data_er = get_matrix(cols, num_states, rate, "ER")
 data_cont = get_continuous_matrix(cols)
-data_step = get_matrix(cols, num_states, rate, get_state_model(num_states))
-data_w = get_matrix(cols, num_states, rate, step_func)
+data_state = get_matrix(cols, num_states, rate, get_state_model(num_states))
+data_step = get_matrix(cols, num_states, rate, step_func)
 x_er = data_er[[1]]
 x_cont = data_cont[[1]]
 x_cont = ifelse(x_cont<0, 0, x_cont)
+x_state = data_state[[1]]
 x_step = data_step[[1]]
-x_w = data_w[[1]]
 
 #pdf("./tree_demo.pdf", height=8.5, width=20)
-
 par(mfrow=c(2,2))
-plot(tree, show.tip.label=F)
-labels = x_er
-title(paste("ER, root=", data_er[[2]], sep=""))
-Y <- labels[1:num_states]
-A <- labels[-(1:num_states)]
-nodelabels(A)
-tiplabels(Y)    
-
-plot(tree, show.tip.label=F)
-labels = x_cont
-title(paste("Continuous, root=", data_cont[[2]], sep=""))
-Y <- labels[1:num_states]
-A <- labels[-(1:num_states)]
-nodelabels(A)
-tiplabels(Y)    
-
-plot(tree, show.tip.label=F)
-labels = x_step
-title(paste("Step, root=", data_step[[2]], sep=""))
-Y <- labels[1:num_states]
-A <- labels[-(1:num_states)]
-nodelabels(A)
-tiplabels(Y)    
-
-plot(tree, show.tip.label=F)
-labels = x_w
-title(paste("W, root=", data_step[[2]], sep=""))
-Y <- labels[1:num_states]
-A <- labels[-(1:num_states)]
-nodelabels(A)
-tiplabels(Y)    
-
+data = list(x_er, x_cont, x_state, x_step)
+titles = c('ER', "Continuous", "State", "Step")
+for (i in 1:length(data)) {
+    plot(tree, show.tip.label=F)
+    labels = data[i][[1]]
+    title(titles[i])
+    Y <- labels[1:num_states]
+    A <- labels[-(1:num_states)]
+    nodelabels(A)
+    tiplabels(Y)        
+}
 
 #dev.off()
