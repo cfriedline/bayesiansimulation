@@ -536,7 +536,6 @@ def get_trees(tree_file, out_dir):
     trees = []
     for line in open(tree_file):
         trees.append(line.rstrip())
-    file = os.path.join(out_dir, "trees.txt")
     return trees
 
 
@@ -600,7 +599,7 @@ def run_full_simulation(sample_trees, filedata, args, taxa_tree, taxa_tree_fixed
                                        filedata, args.brlen, args.mrbayes_timeout)
             celery_results.append(res)
             submit_count += 1
-            if submit_count == 8:
+            if submit_count == 1:
                 break
         else:
             run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, out_file, dist_file,
