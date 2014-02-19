@@ -18,6 +18,9 @@ import celery
 from celery import Celery
 from runsimulation4 import *  #workaround for celery
 import tempfile
+import logging
+
+logger = logging.getLogger(__name__)
 
 numpy2ri.activate()
 sys.setrecursionlimit(1000000)
