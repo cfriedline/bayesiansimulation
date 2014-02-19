@@ -406,7 +406,6 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     w_cluster_tree, w_cluster_diffs = get_unifrac_cluster(tree, w_matrix, w_names)
     w_nj_tree, w_nj_diffs = get_unifrac_nj(tree, w_matrix, w_names)
 
-
     # unifrac tests (normalized branch lengths on taxa tree)
     u_pcoa_tree_norm, u_pcoa_diffs_norm = get_unifrac_pcoa(tree, u_matrix_norm, u_names_norm)
     u_cluster_tree_norm, u_cluster_diffs_norm = get_unifrac_cluster(tree, u_matrix_norm, u_names_norm)
@@ -414,7 +413,6 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     w_pcoa_tree_norm, w_pcoa_diffs_norm = get_unifrac_pcoa(tree, w_matrix_norm, w_names_norm)
     w_cluster_tree_norm, w_cluster_diffs_norm = get_unifrac_cluster(tree, w_matrix_norm, w_names_norm)
     w_nj_tree_norm, w_nj_diffs_norm = get_unifrac_nj(tree, w_matrix_norm, w_names_norm)
-
 
     # bray-curtis tests
     bc_pcoa_tree, bc_pcoa_diffs = get_bc_pcoa(tree, abund, sample_names)
@@ -605,7 +603,7 @@ def run_full_simulation(sample_trees, filedata, args, taxa_tree, taxa_tree_fixed
             run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, out_file, dist_file,
                            args.abundance_from_states,
                            filedata, args.brlen, args.mrbayes_timeout)
-            if tree_num == 0:
+            if tree_num == 10:
                 break
 
     if filedata['celery']:
