@@ -23,12 +23,11 @@ def run_qstat(name):
     proc = subprocess.Popen(['qstat'], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     for line in proc.stdout:
         line = line.rstrip()
-        if 'godel' in line:
-            data = re.split('\s+', line)
-            if data[3] == name:
-                d.append(data[1])
-            else:
-                print "skipping %s" % line
+        data = re.split('\s+', line)
+        if len(data) > 1 and data[2] == name:
+            d.append(data[0])
+        else:
+            print "skipping %s" % line
     return d
 
 
