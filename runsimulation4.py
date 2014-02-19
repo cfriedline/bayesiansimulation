@@ -108,6 +108,18 @@ def create_R():
 
     """)
 
+    r("""
+        get_step_model = function(num_states) {
+            mat=matrix(seq(1:num_states**2),num_states)
+            for (i in 1:num_states) {
+                for (j in 1:num_states) {
+                    mat[i,j] = abs(i-j)
+                }
+            }
+        return(mat)
+        }
+    """)
+
     return r
 
 
