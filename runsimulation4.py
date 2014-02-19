@@ -458,13 +458,13 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     sym_state_abund = app.get_sym_state_abundance_matrix(r)
     sym_state_ranges = get_column_ranges(numpy.array(sym_state_abund))
     sym_state_gap = app.restandardize_matrix(sym_state_abund, sym_state_ranges, num_states)
-    print_state_distribution("sym_state", cont_gap, num_cols, tree_num, sample_names, dist_file)
+    print_state_distribution("sym_state", sym_state_gap, num_cols, tree_num, sample_names, dist_file)
 
     #symmetric step model
     sym_step_abund = app.get_sym_step_abundance_matrix(r)
     sym_step_ranges = get_column_ranges(numpy.array(sym_step_abund))
     sym_step_gap = app.restandardize_matrix(sym_step_abund, sym_step_ranges, num_states)
-    print_state_distribution("sym_step", cont_gap, num_cols, tree_num, sample_names, dist_file)
+    print_state_distribution("sym_step", sym_step_gap, num_cols, tree_num, sample_names, dist_file)
 
     (u_matrix, u_names), (w_matrix, w_names) = app.calculate_unifrac(abund, sample_names, taxa_tree)
     (u_matrix_norm, u_names_norm), (w_matrix_norm, w_names_norm) = app.calculate_unifrac(abund, sample_names,
