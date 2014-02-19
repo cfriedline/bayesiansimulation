@@ -28,10 +28,8 @@ from itertools import izip
 #mp_logger.setLevel(mp.SUBDEBUG)
 import logging
 
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-sh = logging.StreamHandler()
-logger.setLevel(logging.DEBUG)
-logger.addHandler(sh)
 
 numpy2ri.activate()
 from cogent import LoadTree

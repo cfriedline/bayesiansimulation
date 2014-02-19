@@ -20,10 +20,8 @@ from runsimulation4 import *  #workaround for celery
 import tempfile
 import logging
 
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-sh = logging.StreamHandler()
-logger.addHandler(sh)
 
 numpy2ri.activate()
 sys.setrecursionlimit(1000000)
