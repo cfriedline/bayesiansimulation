@@ -29,6 +29,9 @@ from itertools import izip
 import logging
 
 logger = logging.getLogger(__name__)
+sh = logging.StreamHandler()
+logger.setLevel(logging.DEBUG)
+logger.addHandler(sh)
 
 numpy2ri.activate()
 from cogent import LoadTree
@@ -50,7 +53,8 @@ def clockit(func):
         retval = func(*args, **kw)
         t.stop()
         output = '\t%s in %s' % (func.__name__, t)
-        print output
+        #print output
+        logger.info(output)
         if log_file is not None:
             log_file.write("%s\n" % output)
             log_file.flush()

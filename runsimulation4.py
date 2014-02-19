@@ -21,6 +21,9 @@ import tempfile
 import logging
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+sh = logging.StreamHandler()
+logger.addHandler(sh)
 
 numpy2ri.activate()
 sys.setrecursionlimit(1000000)
