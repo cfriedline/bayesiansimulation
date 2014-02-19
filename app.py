@@ -26,6 +26,9 @@ import random
 from itertools import izip
 #mp_logger = mp.log_to_stderr()
 #mp_logger.setLevel(mp.SUBDEBUG)
+import logging
+
+logger = logging.getLogger(__name__)
 
 numpy2ri.activate()
 from cogent import LoadTree
