@@ -193,7 +193,7 @@ def print_state_distribution(name_key, data, num_cols, tree_num, sample_names, d
             if key in counts[i]:
                 count = counts[i][key]
             s += "\t" + str(int(key)) + ":" + str(int(count))
-        print s
+        logger.info(s)
         dist_file.write("%s\n" % s)
     dist_file.write("\n")
 
@@ -216,7 +216,7 @@ def print_sample_trees(r, tree, num_taxa, num_cols, tree_num, filedata):
 def curate_data_matrix(r, data, ranges):
     badcols = get_bad_cols(ranges)
     drop_string = ','.join([str(elem + 1) for elem in badcols])
-    print drop_string
+    logger.warn(drop_string)
     if len(drop_string) > 0:
         r('data = data[,-c(%s)]' % drop_string)
         data = numpy.asarray(r['data'])
@@ -230,7 +230,7 @@ def get_tab_string(tuple):
 
 @clockit
 def store_valid_matrix_data(r, taxa_tree, num_cols, num_states, rate):
-    print "Storing valid matrix data in R session"
+    logger.info("Storing valid matrix data in R session")
     r('matrix_data = get_valid_matrix(%d, %d, %f)' % (num_cols, num_states, rate))
     r('cont_matrix_data = get_continuous_matrix(%d, %f, %f, %f)' % (num_cols, gamma_shape, gamma_scale, sigma))
     r('data = matrix_data[[1]]')
@@ -284,11 +284,11 @@ def get_gap_weight(abund, min, max, states):
     try:
         return round(((float(abund) - min) * (states - 1)) / (max - min))
     except:
-        print max, min
+        logger.warn(max, min)
 
 
 def fake(i):
-    print "fake", i
+    logger.debug("fake", i)
 
 
 def get_abundance_ranges(r, gap, num_states):
@@ -368,7 +368,7 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
         r('tree$edge.length = rep(%f, length(tree$edge.length))' % float(brlen))
 
     tree = app.ape_to_dendropy(r['tree'])
-    print tree
+    logger.info(tree)
     store_valid_matrix_data(r, taxa_tree, num_cols, num_states, filedata['rate'])
     data = numpy.asarray(r['data'])
     roots = list(r['roots'])
@@ -377,7 +377,7 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     print_state_distribution("state", data, num_cols, tree_num, sample_names, dist_file)
     gap = None
     if not abundance_from_states:
-        print "not abundance from states!"
+        logger.warn("not abundance from states!")
         ranges = get_column_ranges(data)
         data, ranges = curate_data_matrix(r, data, ranges)
         gap = app.restandardize_matrix(data, ranges, num_states)
@@ -460,7 +460,7 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
                         get_tab_string(bc_cluster_diffs),
                         get_tab_string(bc_nj_diffs)))
     except:
-        print "Unexpected error in writing output", sys.exc_info()
+        logger.error("Unexpected error in writing output", sys.exc_info())
         sys.exit()
 
     if is_celery:
@@ -595,7 +595,7 @@ def run_full_simulation(sample_trees, filedata, args, taxa_tree, taxa_tree_fixed
     for tree_num, sample_tree in enumerate(sample_trees):
 
         if filedata['celery']:
-            print tree_num
+            logger.info(tree_num)
             res = run_simulation.delay(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, None, None,
                                        args.abundance_from_states,
                                        filedata, args.brlen, args.mrbayes_timeout)
@@ -613,7 +613,7 @@ def run_full_simulation(sample_trees, filedata, args, taxa_tree, taxa_tree_fixed
     if filedata['celery']:
         for i, res in enumerate(celery_results):
             res = res.get()
-            print "getting results for task %d" % i
+            logger.info("getting results for task %d" % i)
             o = open(res[0])
             d = open(res[1])
             for line in o:
@@ -670,6 +670,6 @@ def main():
 
 if __name__ == '__main__':
     main()
-    print "Done!"
+    logger.info("Done!")
 
 
