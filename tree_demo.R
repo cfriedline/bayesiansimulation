@@ -75,13 +75,13 @@ rTraitDisc2 <-
         x
     }
 
-get_matrix = function(cols, numstates, rate, model) {
+get_matrix = function(cols, model) {
     found = 0
     while (found < cols) {
-        root = sample(numstates, size=1)
+        root = sample(nrow(model), size=1)
         temp = rTraitDisc2(tree, model=model, 
-                          k=numstates, states=1:numstates, 
-                          rate=rate, root.value=root,
+                          states=1:nrow(model), 
+                          root.value=root,
                           ancestor=T)
         temp = as.matrix(temp)
         if (min(temp) < max(temp)) {
@@ -98,19 +98,41 @@ get_matrix = function(cols, numstates, rate, model) {
     return(list(m, roots))
 }
 
-get_state_model = function(num_states) {
+get_state_model = function(num_states,rate) {
     mat=matrix(seq(1:num_states**2),num_states)
     for (i in 1:num_states) {
         for (j in 1:num_states) {
-            mat[i,j] = (1/num_states)/abs(i-j)
+            if (i != j) {
+                mat[i,j] = rate*(num_states-(abs(i-j)))
+            } else {
+                mat[i,j] = 0
+            }
         }
     }
     print(mat)
     return(mat)
 }
 
-get_er_model = function(num_states) {
-    mat = matrix(rep(1/num_states, num_states**2), 8)
+get_er_model = function(num_states, rate) {
+    mat = matrix(rep(rate, num_states**2), num_states)
+    print(mat)
+    mat
+}
+
+get_restricted_er_model = function(num_states, rate) {
+    mat = get_er_model(num_states, rate)
+    for (i in 1:nrow(mat)) {
+        for (j in 1:ncol(mat)) {
+            if (abs(i-j) == 1) {
+                mat[i,j] = rate    
+            } else if (i != j) {
+                mat[i,j] = rate*0.00001
+            } else {
+                mat[i,j] = 0
+            }
+        }
+    }
+    #print(mat)
     mat
 }
 
@@ -125,17 +147,18 @@ get_continuous_matrix = function(cols) {
 
 num_states = 8
 cols = 1
-rate = 1/8
+rate = 1
 tree =  rtree(num_states)
-#tree$edge.length = rep(0.5, length(tree$edge.length))
-data_er = get_matrix(cols, num_states, rate, get_er_model(num_states))
+tree$edge.length = rep(0.5, length(tree$edge.length))
+data_er = get_matrix(cols, get_er_model(num_states, rate))
+data_res_er = get_matrix(cols, get_restricted_er_model(num_states, rate))
 data_cont = get_continuous_matrix(cols)
-data_state = get_matrix(cols, num_states, rate, get_state_model(num_states))
+data_state = get_matrix(cols, get_state_model(num_states,rate))
 
 #pdf("./tree_demo.pdf", height=8.5, width=20)
 par(mfrow=c(2,2))
-data = list(data_er, data_cont, data_state)
-titles = c('ER', "Continuous", "State")
+data = list(data_er, data_res_er, data_cont, data_state)
+titles = c('ER', "Restricted ER", "Continuous", "State")
 for (i in 1:length(data)) {
     plot(tree, show.tip.label=F)
     labels = data[i][[1]][[1]]

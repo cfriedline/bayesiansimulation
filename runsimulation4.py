@@ -41,7 +41,7 @@ procs = 8
 num_taxa = 8
 num_states = 8
 bits = 3
-rate = 1.0/num_states
+rate = 1.0
 gamma_shape = 1
 gamma_scale = 1000
 sigma = 0.5  #for BM
@@ -79,11 +79,11 @@ def create_R():
     """)
 
     r("""
-        get_valid_matrix = function(cols, numstates, rate, model) {
+        get_valid_matrix = function(cols, model) {
             found = 0
             while (found < cols) {
-                root = sample(numstates)[1]
-                temp = rTraitDisc(tree, model=model, k=numstates, states=1:numstates, rate=rate, root.value=root)
+                root = sample(nrow(model))[1]
+                temp = rTraitDisc(tree, model=model, states=1:nrow(model), root.value=root)
                 temp = as.matrix(temp)
                 if (min(temp) < max(temp)) {
                     if (found == 0) {
@@ -112,21 +112,43 @@ def create_R():
     """)
 
     r("""
-        get_er_model = function(num_states) {
-            mat = matrix(rep(1/num_states, num_states**2), 8)
+        get_er_model = function(num_states, rate) {
+            mat = matrix(rep(rate, num_states**2), num_states)
             mat
         }
     """)
 
     r("""
-        get_sym_state_model = function(numstates) {
-            mat=matrix(seq(1:numstates**2),numstates)
-            for (i in 1:numstates) {
-                for (j in 1:numstates) {
-                    mat[i,j]=(1/numstates)/abs(i-j)
+        get_restricted_er_model = function(num_states, rate) {
+            mat = get_er_model(num_states, rate)
+            for (i in 1:nrow(mat)) {
+                for (j in 1:ncol(mat)) {
+                    if (abs(i-j) == 1) {
+                        mat[i,j] = rate
+                    } else if (i != j) {
+                        mat[i,j] = rate*0.00001
+                    } else {
+                        mat[i,j] = 0
+                    }
                 }
             }
-        return(mat)
+            mat
+        }
+    """)
+
+    r("""
+        get_sym_state_model = function(num_states, rate) {
+            mat=matrix(seq(1:num_states**2),num_states)
+            for (i in 1:num_states) {
+                for (j in 1:num_states) {
+                    if (i != j) {
+                        mat[i,j] = rate*(num_states-(abs(i-j)))
+                    } else {
+                        mat[i,j] = 0
+                    }
+                }
+            }
+            return(mat)
         }
     """)
     return r
@@ -188,7 +210,7 @@ def print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, c
     print_ranges(cont_ranges, "cont_ranges", num_cols, tree_num, filedata)
     print_ranges(sub_abund_ranges, "sub_ranges", num_cols, tree_num, filedata)
     print_ranges(sym_state_ranges, "sym_state_ranges", num_cols, tree_num, filedata)
-    
+
 
 @clockit
 def print_state_distribution(name_key, data, num_cols, tree_num, sample_names, dist_file):
@@ -256,26 +278,32 @@ def get_tab_string(tuple):
 @clockit
 def store_valid_matrix_data(r, taxa_tree, num_cols, num_states, rate):
     logger.info("Storing valid matrix data in R session")
-    r('matrix_data = get_valid_matrix(%d, %d, %f, %s)' % (num_cols, num_states, rate, "get_er_model(%d)" % num_states))
+    r('er_matrix_data = get_valid_matrix(%d, %s)' % (num_cols, "get_er_model(%d, %f)" % (num_states, rate)))
+    r('res_er_matrix_data = get_valid_matrix(%d, %s)' %
+      (num_cols, "get_restricted_er_model(%d, %f)" % (num_states, rate)))
     r('cont_matrix_data = get_continuous_matrix(%d, %f, %f, %f)' % (num_cols, gamma_shape, gamma_scale, sigma))
-    r('sym_state_matrix_data = get_valid_matrix(%d, %d, %f, %s)' % (
-        num_cols, num_states, rate, "get_sym_state_model(%d)" % num_states))
+    r('sym_state_matrix_data = get_valid_matrix(%d, %s)' %
+      (num_cols, "get_sym_state_model(%d, %f)" % (num_states, rate)))
 
-    r('data = matrix_data[[1]]')
-    r('roots = matrix_data[[2]]')
+    r('data = er_matrix_data[[1]]')
+    r('roots = er_matrix_data[[2]]')
+
+    r('data_res = er_matrix_data[[1]]')
+    r('roots_res = er_matrix_data[[2]]')
 
     r('data_cont = cont_matrix_data[[1]]')
+    r('roots_cont = cont_matrix_data[[2]]')
 
     r('data_sym_state = sym_state_matrix_data[[1]]')
-
-    r('roots_cont = cont_matrix_data[[2]]')
     r('roots_state = sym_state_matrix_data[[2]]')
 
     r("data = t(apply(data, 1, as.numeric))")
+    r("data_res = t(apply(data_res, 1, as.numeric))")
     r("data_sym_state = t(apply(data_sym_state, 1, as.numeric))")
 
     robjects.globalenv['colnames'] = sorted(taxa_tree.taxon_set.labels())
     r('colnames(data) = colnames')
+    r('colnames(data_res) = colnames')
     r('colnames(data_cont) = colnames')
     r('colnames(data_sym_state) = colnames')
 
@@ -423,12 +451,20 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     abund_ranges = abund_pool[0]
 
     sym_state_pool, sym_state_gap = create_abund_pool_from_states(r, app.get_sym_state_gap_matrix(r))
+    res_er_pool, res_gap = create_abund_pool_from_states(r, app.get_res_er_gap_matrix(r))
+    res_er_ranges = res_er_pool[0]
 
     abund = app.get_abundance_matrix(gap, abund_ranges, "gamma", num_states)
     sub_abund = app.subsample_abundance_matrix(abund, 10)
     sub_abund_ranges = get_column_ranges(numpy.array(sub_abund))
     gap_from_sub = app.restandardize_matrix(sub_abund, sub_abund_ranges, num_states)
     print_state_distribution("sub", gap_from_sub, num_cols, tree_num, sample_names, dist_file)
+
+    #restricted er model
+    res_er_abund = app.get_abundance_matrix(res_gap, res_er_ranges, "gamma", num_states)
+    res_er_ranges = get_column_ranges(numpy.array(res_er_abund))
+    gap_from_res_er = app.restandardize_matrix(res_er_abund, res_er_ranges, num_states)
+    print_state_distribution("res_er", gap_from_res_er, num_cols, tree_num, sample_names, dist_file)
 
     #continuous matrix to gap to discrete matrix
     cont_abund = app.get_continuous_abundance_matrix(r)

@@ -668,6 +668,8 @@ def get_random_abundance(weight, col_range):
     rand = numpy.random.uniform(low=r[0], high=r[1])
     return round(rand)
 
+def get_res_er_gap_matrix(r):
+    return numpy.array(r('data_res'))
 
 def get_continuous_abundance_matrix(r):
     return numpy.array(r('data_cont'))
@@ -1337,5 +1339,3 @@ def _count_unique(items):
     uniq_keys = numpy.unique(items)
     bins = uniq_keys.searchsorted(items)
     return uniq_keys, numpy.bincount(bins)
-
-
