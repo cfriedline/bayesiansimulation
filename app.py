@@ -670,15 +670,15 @@ def get_random_abundance(weight, col_range):
 
 
 def get_continuous_abundance_matrix(r):
-    return numpy.array(r('data_cont')).tolist()
+    return numpy.array(r('data_cont'))
 
 
-def get_sym_state_abundance_matrix(r):
-    return numpy.array(r('data_sym_state')).tolist()
+def get_sym_state_gap_matrix(r):
+    return numpy.array(r('data_sym_state'))
 
 
-def get_sym_step_abundance_matrix(r):
-    return numpy.array(r('data_sym_step')).tolist()
+def get_sym_step_gap_matrix(r):
+    return numpy.array(r('data_sym_step'))
 
 @clockit
 def get_abundance_matrix(gap, ranges, dist, num_states):
