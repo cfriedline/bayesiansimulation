@@ -103,7 +103,7 @@ get_state_model = function(num_states,rate) {
     for (i in 1:num_states) {
         for (j in 1:num_states) {
             if (i != j) {
-                mat[i,j] = rate*(num_states-(abs(i-j)))
+                mat[i,j] = (rate/num_states)*(num_states-(abs(i-j)))
             } else {
                 mat[i,j] = 0
             }
@@ -132,7 +132,7 @@ get_restricted_er_model = function(num_states, rate) {
             }
         }
     }
-    #print(mat)
+    print(mat)
     mat
 }
 

@@ -142,7 +142,7 @@ def create_R():
             for (i in 1:num_states) {
                 for (j in 1:num_states) {
                     if (i != j) {
-                        mat[i,j] = rate*(num_states-(abs(i-j)))
+                        mat[i,j] = (rate/num_states)*(num_states-(abs(i-j)))
                     } else {
                         mat[i,j] = 0
                     }
@@ -207,14 +207,12 @@ def print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, c
     print_matrix(res_er_abund, "res_er_abund", sample_names, num_cols, tree_num, True, None, i, filedata)
     print_matrix(res_er_gap, "res_er_gap", sample_names, num_cols, tree_num, True, None, i, filedata)
 
-
     print_ranges(abund_ranges, "ranges", num_cols, tree_num, filedata)
     print_ranges(new_ranges, "new_ranges", num_cols, tree_num, filedata)
     print_ranges(cont_ranges, "cont_ranges", num_cols, tree_num, filedata)
     print_ranges(sub_abund_ranges, "sub_ranges", num_cols, tree_num, filedata)
     print_ranges(sym_state_ranges, "sym_state_ranges", num_cols, tree_num, filedata)
     print_ranges(res_er_ranges, "res_er_ranges", num_cols, tree_num, filedata)
-
 
 
 @clockit
@@ -394,13 +392,13 @@ def create_abund_pool_from_states(r, data):
     return abund_pool, data2
 
 
-def run_mr_bayes(key, tree_num, i, disc, sample_names, orig_tree, filedata, mrbayes_timeout):
+def run_mr_bayes(key, tree_num, i, disc, sample_names, orig_tree, filedata, mrbayes_timeout, rate_type):
     mb_tree = app.run_mrbayes(key, str(tree_num) + "-" + str(i), disc,
                               sample_names, disc.ncol,
                               n_gen, mpi,
                               mb, procs,
                               None, filedata['run_dir'],
-                              len(sample_names), "d", filedata['hostfile'], mrbayes_timeout)
+                              len(sample_names), "d", filedata['hostfile'], mrbayes_timeout, rate_type)
     diffs = app.calculate_differences_r(orig_tree, mb_tree)
     return mb_tree, diffs
 
@@ -525,26 +523,31 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
                    sub_abund, gap_from_sub, sub_abund_ranges, sym_state_abund, sym_state_gap, sym_state_ranges,
                    res_er_abund, res_er_gap, res_er_ranges, num_cols, tree_num, sample_names, roots, 0, filedata)
 
-    mb_tree, mb_diffs = run_mr_bayes("state", tree_num, 0, disc, sample_names, tree, filedata, mrbayes_timeout)
+    mb_tree, mb_diffs = run_mr_bayes("state", tree_num, 0, disc, sample_names, tree, filedata, mrbayes_timeout, "equal")
     mb_tree_sub, mb_diffs_sub = run_mr_bayes("sub", tree_num, 0, sub_disc, sample_names, tree, filedata,
-                                             mrbayes_timeout)
+                                             mrbayes_timeout, "equal")
     mb_tree_cont, mb_diffs_cont = run_mr_bayes("cont", tree_num, 0, cont_disc, sample_names, tree, filedata,
-                                               mrbayes_timeout)
+                                               mrbayes_timeout, "equal")
     mb_tree_sym_state, mb_diffs_sym_state = run_mr_bayes("sym_state", tree_num, 0, sym_state_disc, sample_names, tree,
                                                          filedata,
-                                                         mrbayes_timeout)
+                                                         mrbayes_timeout, "equal")
+    mb_tree_sym_state_gamma, mb_diffs_sym_state_gamma = run_mr_bayes("sym_state", tree_num, 0, sym_state_disc,
+                                                                     sample_names, tree,
+                                                                     filedata,
+                                                                     mrbayes_timeout, "gamma")
     mb_tree_res_er, mb_diffs_res_er = run_mr_bayes("res_er", tree_num, 0, res_er_disc, sample_names, tree,
                                                    filedata,
-                                                   mrbayes_timeout)
+                                                   mrbayes_timeout, "equal")
 
     # output
     try:
-        out_file.write("%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" %
+        out_file.write("%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" %
                        (tree_num, num_cols,
                         get_tab_string(mb_diffs),
                         get_tab_string(mb_diffs_sub),
                         get_tab_string(mb_diffs_cont),
                         get_tab_string(mb_diffs_sym_state),
+                        get_tab_string(mb_diffs_sym_state_gamma),
                         get_tab_string(mb_diffs_res_er),
                         get_tab_string(u_pcoa_diffs),
                         get_tab_string(u_cluster_diffs),
@@ -597,6 +600,7 @@ def get_header():
            "mb_topo_sub\tmb_symm_sub\tmb_path_sub\t" \
            "mb_topo_cont\tmb_symm_cont\tmb_path_cont\t" \
            "mb_topo_sym_state\tmb_symm_sym_state\tmb_path_sym_state\t" \
+           "mb_topo_sym_state_gamma\tmb_symm_sym_state_gamma\tmb_path_sym_state_gamma\t" \
            "mb_topo_res_er\tmb_symm_res_er\tmb_path_res_er\t" \
            "u_pcoa_topo\tu_pcoa_symm\tu_pcoa_path\t" \
            "u_cluster_topo\tu_cluster_symm\tu_cluster_path\t" \
