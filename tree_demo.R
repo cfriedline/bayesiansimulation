@@ -103,60 +103,44 @@ get_state_model = function(num_states) {
     for (i in 1:num_states) {
         for (j in 1:num_states) {
             mat[i,j] = (1/num_states)/abs(i-j)
-            #mat[i,j] = abs(i-j)
         }
     }
     print(mat)
     return(mat)
 }
 
-step_func = function(x, l) {
-    m = matrix(1:num_states,1)
-    for (i in 1:ncol(m)) {
-        diff=abs(x-i)
-        if (diff==0) {
-            m[1,i] = 0
-        } else {
-            m[1,i] = (1/num_states)/diff
-        }        
-    }
-    m[1,x] = 1-sum(m)
-    return(sample(num_states, size=1, prob=m*l))
+get_er_model = function(num_states) {
+    mat = matrix(rep(1/num_states, num_states**2), 8)
+    mat
 }
-    
 
 get_continuous_matrix = function(cols) {
     r = round(rgamma(1, shape=1000, rate=1))
     r = sample(100, size=1)
     m = replicate(cols, rTraitCont(tree, ancestor=T, sigma=r*100, root.value=r))
     m = round(as.matrix(m))
+    m = ifelse(m<0, 0, m)
     return(list(m, r))
 }
 
 num_states = 8
 cols = 1
-rate = 1
+rate = 1/8
 tree =  rtree(num_states)
-# tree$edge.length = tree$edge.length*10
-tree$edge.length = rep(0.5, length(tree$edge.length))
-data_er = get_matrix(cols, num_states, rate, "ER")
+#tree$edge.length = rep(0.5, length(tree$edge.length))
+data_er = get_matrix(cols, num_states, rate, get_er_model(num_states))
 data_cont = get_continuous_matrix(cols)
 data_state = get_matrix(cols, num_states, rate, get_state_model(num_states))
-data_step = get_matrix(cols, num_states, rate, step_func)
-x_er = data_er[[1]]
-x_cont = data_cont[[1]]
-x_cont = ifelse(x_cont<0, 0, x_cont)
-x_state = data_state[[1]]
-x_step = data_step[[1]]
 
 #pdf("./tree_demo.pdf", height=8.5, width=20)
 par(mfrow=c(2,2))
-data = list(x_er, x_cont, x_state, x_step)
-titles = c('ER', "Continuous", "State", "Step")
+data = list(data_er, data_cont, data_state)
+titles = c('ER', "Continuous", "State")
 for (i in 1:length(data)) {
     plot(tree, show.tip.label=F)
-    labels = data[i][[1]]
-    title(titles[i])
+    labels = data[i][[1]][[1]]
+    root = data[i][[1]][[2]]
+    title(paste(titles[i], " (root=", root, ")", sep=""))
     add.scale.bar()
     Y <- labels[1:num_states]
     A <- labels[-(1:num_states)]

@@ -41,7 +41,7 @@ procs = 8
 num_taxa = 8
 num_states = 8
 bits = 3
-rate = 1.0
+rate = 1.0/num_states
 gamma_shape = 1
 gamma_scale = 1000
 sigma = 0.5  #for BM
@@ -106,7 +106,15 @@ def create_R():
             r = sample(100, size=1)
             m = replicate(cols, rTraitCont(tree, ancestor=F, sigma=r*100, root.value=r))
             m = round(as.matrix(m))
+            m = ifelse(m<0, 0, m)
             return(list(m, r))
+        }
+    """)
+
+    r("""
+        get_er_model = function(num_states) {
+            mat = matrix(rep(1/num_states, num_states**2), 8)
+            mat
         }
     """)
 
@@ -248,7 +256,7 @@ def get_tab_string(tuple):
 @clockit
 def store_valid_matrix_data(r, taxa_tree, num_cols, num_states, rate):
     logger.info("Storing valid matrix data in R session")
-    r('matrix_data = get_valid_matrix(%d, %d, %f, %s)' % (num_cols, num_states, rate, "'ER'"))
+    r('matrix_data = get_valid_matrix(%d, %d, %f, %s)' % (num_cols, num_states, rate, "get_er_model(%d)" % num_states))
     r('cont_matrix_data = get_continuous_matrix(%d, %f, %f, %f)' % (num_cols, gamma_shape, gamma_scale, sigma))
     r('sym_state_matrix_data = get_valid_matrix(%d, %d, %f, %s)' % (
         num_cols, num_states, rate, "get_sym_state_model(%d)" % num_states))
@@ -257,7 +265,6 @@ def store_valid_matrix_data(r, taxa_tree, num_cols, num_states, rate):
     r('roots = matrix_data[[2]]')
 
     r('data_cont = cont_matrix_data[[1]]')
-    r('data_cont = ifelse(data_cont < 0, 0, data_cont)')
 
     r('data_sym_state = sym_state_matrix_data[[1]]')
 
