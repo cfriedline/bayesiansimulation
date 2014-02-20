@@ -850,7 +850,7 @@ def create_mrbayes_file(file, log_file, matrix, sample_names, num_cols, n_gen):
     file.write("begin mrbayes;\n")
     file.write("log start filename=%s replace;\n" % os.path.join(os.path.dirname(file.name), log_file))
     file.write("set autoclose=yes nowarn=yes;\n")
-    file.write("lset rates=gamma coding=all;\n")
+    file.write("lset rates=equal coding=all;\n")
     #file.write("mcmcp checkpoint=yes;\n")
     file.write("mcmcp stoprule=YES stopval=0.01 minpartfreq=0.05;\n")
     file.write("mcmc ngen=%d;\n" % n_gen)

@@ -115,7 +115,7 @@ def create_R():
             mat=matrix(seq(1:numstates**2),numstates)
             for (i in 1:numstates) {
                 for (j in 1:numstates) {
-                    mat[i,j] = abs(i-j)
+                    mat[i,j]=(1/numstates)/abs(i-j)
                 }
             }
         return(mat)
@@ -124,7 +124,6 @@ def create_R():
 
     r("""
         step_func = function(x, l) {
-            probs = rep(1, numstates)
             m = matrix(1:numstates,1)
             for (i in 1:ncol(m)) {
                 diff=abs(x-i)
@@ -135,7 +134,7 @@ def create_R():
                 }
             }
             m[1,x] = 1-sum(m)
-            return(sample(numstates, size=1, prob=probs))
+            return(sample(numstates, size=1, prob=m*l))
         }
     """)
 
