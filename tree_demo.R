@@ -1,3 +1,5 @@
+library(ape)
+library(plotrix)
 rTraitDisc2 <-
     function(phy, model = "ER", k = if (is.matrix(model)) ncol(model) else 2,
              rate = 0.1, states = LETTERS[1:k], freq = rep(1/k, k),
@@ -147,19 +149,25 @@ get_continuous_matrix = function(cols) {
 
 num_states = 8
 cols = 1
-rate = 1
+rate = 2
 tree =  rtree(num_states)
 tree$edge.length = rep(0.5, length(tree$edge.length))
-data_er = get_matrix(cols, get_er_model(num_states, rate))
-data_res_er = get_matrix(cols, get_restricted_er_model(num_states, rate))
+er_model = get_er_model(num_states, rate)
+data_er = get_matrix(cols, er_model)
+res_er_model = get_restricted_er_model(num_states, rate)
+data_res_er = get_matrix(cols, res_er_model)
 data_cont = get_continuous_matrix(cols)
-data_state = get_matrix(cols, get_state_model(num_states,rate))
+state_model = get_state_model(num_states, rate)
+data_state = get_matrix(cols, state_model)
 
-#pdf("./tree_demo.pdf", height=8.5, width=20)
-par(mfrow=c(2,2))
+pdf(paste("tree_demo_", rate, ".pdf", sep=""), height=8.5, width=20)
+l = matrix(c(1,2,3,4,5,6,7,8), 4, 2, byrow = TRUE)
+#layout(l)
 data = list(data_er, data_res_er, data_cont, data_state)
 titles = c('ER', "Restricted ER", "Continuous", "State")
+tables = list(er_model, res_er_model, matrix(), state_model)
 for (i in 1:length(data)) {
+    par(mfrow=c(1,2))
     plot(tree, show.tip.label=F)
     labels = data[i][[1]][[1]]
     root = data[i][[1]][[2]]
@@ -168,7 +176,10 @@ for (i in 1:length(data)) {
     Y <- labels[1:num_states]
     A <- labels[-(1:num_states)]
     nodelabels(A)
-    tiplabels(Y)        
+    tiplabels(Y)
+    plot.new()
+    if (i!=3) {
+        addtable2plot(0,0.4,table=tables[i][[1]], xpad=1, title=paste("Q matrix, rate=", rate, sep=""), cex=0.8, hlines=T, vlines=T)
+    }
 }
-
-#dev.off()
+dev.off()
