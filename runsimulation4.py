@@ -163,7 +163,7 @@ def print_ranges(ranges, prefix, num_cols, run, filedata):
 
 def print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, cont_abund, gap_from_cont, cont_ranges,
                    sub_abund, gap_from_sub, sub_abund_ranges, sym_state_abund, sym_state_gap, sym_state_ranges,
-                   sym_step_abund, sym_step_gap, sym_step_ranges, num_cols, tree_num, sample_names, roots, i, filedata):
+                   num_cols, tree_num, sample_names, roots, i, filedata):
     print_matrix(data, "data", sample_names, num_cols, tree_num, True, roots, i, filedata)
     print_matrix(gap, "gap", sample_names, num_cols, tree_num, True, None, i, filedata)
     print_matrix(abund, "abund", sample_names, num_cols, tree_num, True, None, i, filedata)
@@ -174,16 +174,13 @@ def print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, c
     print_matrix(gap_from_sub, "sub_gap_abund", sample_names, num_cols, tree_num, True, None, i, filedata)
     print_matrix(sym_state_abund, "sym_state_abund", sample_names, num_cols, tree_num, True, None, i, filedata)
     print_matrix(sym_state_gap, "sym_state_gap", sample_names, num_cols, tree_num, True, None, i, filedata)
-    print_matrix(sym_step_abund, "sym_step_abund", sample_names, num_cols, tree_num, True, None, i, filedata)
-    print_matrix(sym_step_gap, "sym_step_gap", sample_names, num_cols, tree_num, True, None, i, filedata)
 
     print_ranges(abund_ranges, "ranges", num_cols, tree_num, filedata)
     print_ranges(new_ranges, "new_ranges", num_cols, tree_num, filedata)
     print_ranges(cont_ranges, "cont_ranges", num_cols, tree_num, filedata)
     print_ranges(sub_abund_ranges, "sub_ranges", num_cols, tree_num, filedata)
     print_ranges(sym_state_ranges, "sym_state_ranges", num_cols, tree_num, filedata)
-    print_ranges(sym_step_ranges, "sym_step_ranges", num_cols, tree_num, filedata)
-
+    
 
 @clockit
 def print_state_distribution(name_key, data, num_cols, tree_num, sample_names, dist_file):
