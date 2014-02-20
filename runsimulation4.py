@@ -121,23 +121,6 @@ def create_R():
         return(mat)
         }
     """)
-
-    r("""
-        step_func = function(x, l) {
-            m = matrix(1:numstates,1)
-            for (i in 1:ncol(m)) {
-                diff=abs(x-i)
-                if (diff==0) {
-                    m[1,i] = 0
-                } else {
-                    m[1,i] = (1/numstates)/diff
-                }
-            }
-            m[1,x] = 1-sum(m)
-            return(sample(numstates, size=1, prob=m*l))
-        }
-    """)
-
     return r
 
 
@@ -270,7 +253,6 @@ def store_valid_matrix_data(r, taxa_tree, num_cols, num_states, rate):
     logger.info("Storing valid matrix data in R session")
     r('matrix_data = get_valid_matrix(%d, %d, %f, %s)' % (num_cols, num_states, rate, "'ER'"))
     r('cont_matrix_data = get_continuous_matrix(%d, %f, %f, %f)' % (num_cols, gamma_shape, gamma_scale, sigma))
-    r('sym_step_matrix_data = get_valid_matrix(%d, %d, %f, %s)' % (num_cols, num_states, rate, "step_func"))
     r('sym_state_matrix_data = get_valid_matrix(%d, %d, %f, %s)' % (
         num_cols, num_states, rate, "get_sym_state_model(%d)" % num_states))
 
@@ -280,22 +262,17 @@ def store_valid_matrix_data(r, taxa_tree, num_cols, num_states, rate):
     r('data_cont = cont_matrix_data[[1]]')
     r('data_cont = ifelse(data_cont < 0, 0, data_cont)')
 
-    r('data_sym_step = sym_step_matrix_data[[1]]')
-
     r('data_sym_state = sym_state_matrix_data[[1]]')
 
     r('roots_cont = cont_matrix_data[[2]]')
-    r('roots_step = sym_step_matrix_data[[2]]')
     r('roots_state = sym_state_matrix_data[[2]]')
 
     r("data = t(apply(data, 1, as.numeric))")
-    r("data_sym_step = t(apply(data_sym_step, 1, as.numeric))")
     r("data_sym_state = t(apply(data_sym_state, 1, as.numeric))")
 
     robjects.globalenv['colnames'] = sorted(taxa_tree.taxon_set.labels())
     r('colnames(data) = colnames')
     r('colnames(data_cont) = colnames')
-    r('colnames(data_sym_step) = colnames')
     r('colnames(data_sym_state) = colnames')
 
 
@@ -442,7 +419,6 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     abund_ranges = abund_pool[0]
 
     sym_state_pool, sym_state_gap = create_abund_pool_from_states(r, app.get_sym_state_gap_matrix(r))
-    sym_step_pool, sym_step_gap = create_abund_pool_from_states(r, app.get_sym_step_gap_matrix(r))
 
     abund = app.get_abundance_matrix(gap, abund_ranges, "gamma", num_states)
     sub_abund = app.subsample_abundance_matrix(abund, 10)
@@ -460,11 +436,6 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     sym_state_ranges = sym_state_pool[0]
     sym_state_abund = app.get_abundance_matrix(sym_state_gap, sym_state_ranges, "gamma", num_states)
     print_state_distribution("sym_state", sym_state_gap, num_cols, tree_num, sample_names, dist_file)
-
-    #symmetric step model
-    sym_step_ranges = sym_state_pool[0]
-    sym_step_abund = app.get_abundance_matrix(sym_step_gap, sym_step_ranges, "gamma", num_states)
-    print_state_distribution("sym_step", sym_step_gap, num_cols, tree_num, sample_names, dist_file)
 
     (u_matrix, u_names), (w_matrix, w_names) = app.calculate_unifrac(abund, sample_names, taxa_tree)
     (u_matrix_norm, u_names_norm), (w_matrix_norm, w_names_norm) = app.calculate_unifrac(abund, sample_names,
@@ -495,21 +466,17 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
 
     cont_ranges = get_column_ranges(numpy.array(cont_abund))
     sym_state_ranges = get_column_ranges(numpy.array(sym_state_abund))
-    sym_step_ranges = get_column_ranges(numpy.array(sym_step_abund))
 
     gap_from_cont = app.restandardize_matrix(cont_abund, cont_ranges, num_states)
     gap_from_sym_state = app.restandardize_matrix(sym_state_abund, sym_state_ranges, num_states)
-    gap_from_sym_step = app.restandardize_matrix(sym_step_abund, sym_step_ranges, num_states)
 
     disc = app.get_discrete_matrix_from_standardized(gap_from_abund, bits, sample_names)
     disc2 = app.get_discrete_matrix_from_standardized(gap_from_sub, bits, sample_names)
     cont_disc = app.get_discrete_matrix_from_standardized(gap_from_cont, bits, sample_names)
     sym_state_disc = app.get_discrete_matrix_from_standardized(gap_from_sym_state, bits, sample_names)
-    sym_step_disc = app.get_discrete_matrix_from_standardized(gap_from_sym_step, bits, sample_names)
 
     print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, cont_abund, gap_from_cont, cont_ranges,
                    sub_abund, gap_from_sub, sub_abund_ranges, sym_state_abund, sym_state_gap, sym_state_ranges,
-                   sym_step_abund, sym_step_gap, sym_step_ranges,
                    num_cols, tree_num, sample_names, roots, 0, filedata)
 
     mb_tree, mb_diffs = run_mr_bayes("state", tree_num, 0, disc, sample_names, tree, filedata, mrbayes_timeout)
@@ -519,20 +486,15 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     mb_tree_sym_state, mb_diffs_sym_state = run_mr_bayes("sym_state", tree_num, 0, sym_state_disc, sample_names, tree,
                                                          filedata,
                                                          mrbayes_timeout)
-    mb_tree_sym_step, mb_diffs_sym_step = run_mr_bayes("sym_step", tree_num, 0, sym_step_disc, sample_names, tree,
-                                                       filedata,
-                                                       mrbayes_timeout)
-
 
     # output
     try:
-        out_file.write("%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" %
+        out_file.write("%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" %
                        (tree_num, num_cols,
                         get_tab_string(mb_diffs),
                         get_tab_string(mb_diffs2),
                         get_tab_string(mb_diffs_cont),
                         get_tab_string(mb_diffs_sym_state),
-                        get_tab_string(mb_diffs_sym_step),
                         get_tab_string(u_pcoa_diffs),
                         get_tab_string(u_cluster_diffs),
                         get_tab_string(u_nj_diffs),
@@ -581,10 +543,9 @@ def print_taxa_tree(tree, num_cols, filedata):
 def get_header():
     return "tree_num\tcols\t" \
            "mb_topo\tmb_symm\tmb_path\t" \
-           "mb_topo2\tmb_symm2\tmb_path2\t" \
+           "mb_topo_sub\tmb_symm_sub\tmb_path_sub\t" \
            "mb_topo_cont\tmb_symm_cont\tmb_path_cont\t" \
            "mb_topo_sym_state\tmb_symm_sym_state\tmb_path_sym_state\t" \
-           "mb_topo_sym_step\tmb_symm_sym_step\tmb_path_sym_step\t" \
            "u_pcoa_topo\tu_pcoa_symm\tu_pcoa_path\t" \
            "u_cluster_topo\tu_cluster_symm\tu_cluster_path\t" \
            "u_nj_topo\tu_nj_symm\tu_nj_path\t" \

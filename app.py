@@ -677,9 +677,6 @@ def get_sym_state_gap_matrix(r):
     return numpy.array(r('data_sym_state'))
 
 
-def get_sym_step_gap_matrix(r):
-    return numpy.array(r('data_sym_step'))
-
 @clockit
 def get_abundance_matrix(gap, ranges, dist, num_states):
     """
