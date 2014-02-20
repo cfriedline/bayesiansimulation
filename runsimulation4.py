@@ -178,21 +178,23 @@ def print_ranges(ranges, prefix, num_cols, run, filedata):
             fh.write("%d\t%s\n" % (i, '\t'.join([str(int(elem)) for elem in range[0:2]])))
 
 
-def print_matrices(data, gap, abund, ranges, gap_abund, new_ranges, cont_abund, cont_gap, cont_ranges, sub_abund,
-                   sub_abund_ranges, sym_state_abund, sym_state_ranges, sym_step_abund, sym_step_ranges, num_cols,
-                   tree_num, sample_names, roots, i,
-                   filedata):
+def print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, cont_abund, gap_from_cont, cont_ranges,
+                   sub_abund, gap_from_sub, sub_abund_ranges, sym_state_abund, sym_state_gap, sym_state_ranges,
+                   sym_step_abund, sym_step_gap, sym_step_ranges, num_cols, tree_num, sample_names, roots, i, filedata):
     print_matrix(data, "data", sample_names, num_cols, tree_num, True, roots, i, filedata)
     print_matrix(gap, "gap", sample_names, num_cols, tree_num, True, None, i, filedata)
     print_matrix(abund, "abund", sample_names, num_cols, tree_num, True, None, i, filedata)
-    print_matrix(gap_abund, "gap_abund", sample_names, num_cols, tree_num, True, None, i, filedata)
+    print_matrix(gap_from_abund, "gap_abund", sample_names, num_cols, tree_num, True, None, i, filedata)
     print_matrix(cont_abund, "cont_abund", sample_names, num_cols, tree_num, True, None, i, filedata)
-    print_matrix(cont_gap, "cont_gap", sample_names, num_cols, tree_num, True, None, i, filedata)
+    print_matrix(gap_from_cont, "cont_gap", sample_names, num_cols, tree_num, True, None, i, filedata)
     print_matrix(sub_abund, "sub_abund", sample_names, num_cols, tree_num, True, None, i, filedata)
+    print_matrix(gap_from_sub, "sub_gap_abund", sample_names, num_cols, tree_num, True, None, i, filedata)
     print_matrix(sym_state_abund, "sym_state_abund", sample_names, num_cols, tree_num, True, None, i, filedata)
+    print_matrix(sym_state_gap, "sym_state_gap", sample_names, num_cols, tree_num, True, None, i, filedata)
     print_matrix(sym_step_abund, "sym_step_abund", sample_names, num_cols, tree_num, True, None, i, filedata)
+    print_matrix(sym_step_gap, "sym_step_gap", sample_names, num_cols, tree_num, True, None, i, filedata)
 
-    print_ranges(ranges, "ranges", num_cols, tree_num, filedata)
+    print_ranges(abund_ranges, "ranges", num_cols, tree_num, filedata)
     print_ranges(new_ranges, "new_ranges", num_cols, tree_num, filedata)
     print_ranges(cont_ranges, "cont_ranges", num_cols, tree_num, filedata)
     print_ranges(sub_abund_ranges, "sub_ranges", num_cols, tree_num, filedata)
@@ -279,10 +281,8 @@ def store_valid_matrix_data(r, taxa_tree, num_cols, num_states, rate):
     r('data_cont = ifelse(data_cont < 0, 0, data_cont)')
 
     r('data_sym_step = sym_step_matrix_data[[1]]')
-    r('data_sym_step = ifelse(data_sym_step < 0, 0, data_sym_step)')
 
     r('data_sym_state = sym_state_matrix_data[[1]]')
-    r('data_sym_state = ifelse(data_sym_state < 0, 0, data_sym_state)')
 
     r('roots_cont = cont_matrix_data[[2]]')
     r('roots_step = sym_step_matrix_data[[2]]')
@@ -439,8 +439,10 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
         gap = app.restandardize_matrix(data, ranges, num_states)
 
     abund_pool, gap = create_abund_pool_from_states(r, data)
-
     abund_ranges = abund_pool[0]
+
+    sym_state_pool, sym_state_gap = create_abund_pool_from_states(r, app.get_sym_state_gap_matrix(r))
+    sym_step_pool, sym_step_gap = create_abund_pool_from_states(r, app.get_sym_step_gap_matrix(r))
 
     abund = app.get_abundance_matrix(gap, abund_ranges, "gamma", num_states)
     sub_abund = app.subsample_abundance_matrix(abund, 10)
@@ -450,20 +452,18 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
 
     #continuous matrix to gap to discrete matrix
     cont_abund = app.get_continuous_abundance_matrix(r)
-    cont_ranges = get_column_ranges(numpy.array(cont_abund))
-    cont_gap = app.restandardize_matrix(cont_abund, cont_ranges, num_states)
-    print_state_distribution("cont", cont_gap, num_cols, tree_num, sample_names, dist_file)
+    cont_ranges = get_column_ranges(cont_abund)
+    gap_from_cont = app.restandardize_matrix(cont_abund, cont_ranges, num_states)
+    print_state_distribution("cont", gap_from_cont, num_cols, tree_num, sample_names, dist_file)
 
     #symmetric state model
-    sym_state_abund = app.get_sym_state_abundance_matrix(r)
-    sym_state_ranges = get_column_ranges(numpy.array(sym_state_abund))
-    sym_state_gap = app.restandardize_matrix(sym_state_abund, sym_state_ranges, num_states)
+    sym_state_ranges = sym_state_pool[0]
+    sym_state_abund = app.get_abundance_matrix(sym_state_gap, sym_state_ranges, "gamma", num_states)
     print_state_distribution("sym_state", sym_state_gap, num_cols, tree_num, sample_names, dist_file)
 
     #symmetric step model
-    sym_step_abund = app.get_sym_step_abundance_matrix(r)
-    sym_step_ranges = get_column_ranges(numpy.array(sym_step_abund))
-    sym_step_gap = app.restandardize_matrix(sym_step_abund, sym_step_ranges, num_states)
+    sym_step_ranges = sym_state_pool[0]
+    sym_step_abund = app.get_abundance_matrix(sym_step_gap, sym_step_ranges, "gamma", num_states)
     print_state_distribution("sym_step", sym_step_gap, num_cols, tree_num, sample_names, dist_file)
 
     (u_matrix, u_names), (w_matrix, w_names) = app.calculate_unifrac(abund, sample_names, taxa_tree)
@@ -490,17 +490,26 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     bc_pcoa_tree, bc_pcoa_diffs = get_bc_pcoa(tree, abund, sample_names)
     bc_cluster_tree, bc_cluster_diffs = get_bc_cluster(tree, abund, sample_names)
     bc_nj_tree, bc_nj_diffs = get_bc_nj(tree, abund, sample_names)
-
     new_ranges = get_column_ranges(numpy.array(abund))
     gap_from_abund = app.restandardize_matrix(abund, new_ranges, num_states)
-    disc = app.get_discrete_matrix_from_standardized(gap_from_abund, bits, sample_names)
-    disc2 = app.get_discrete_matrix_from_standardized2(gap_from_sub, num_states, sample_names)
-    cont_disc = app.get_discrete_matrix_from_standardized2(cont_gap, num_states, sample_names)
-    sym_state_disc = app.get_discrete_matrix_from_standardized2(sym_state_gap, num_states, sample_names)
-    sym_step_disc = app.get_discrete_matrix_from_standardized2(sym_step_gap, num_states, sample_names)
 
-    print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, cont_abund, cont_gap, cont_ranges,
-                   sub_abund, sub_abund_ranges, sym_state_abund, sym_state_ranges, sym_step_abund, sym_step_ranges,
+    cont_ranges = get_column_ranges(numpy.array(cont_abund))
+    sym_state_ranges = get_column_ranges(numpy.array(sym_state_abund))
+    sym_step_ranges = get_column_ranges(numpy.array(sym_step_abund))
+
+    gap_from_cont = app.restandardize_matrix(cont_abund, cont_ranges, num_states)
+    gap_from_sym_state = app.restandardize_matrix(sym_state_abund, sym_state_ranges, num_states)
+    gap_from_sym_step = app.restandardize_matrix(sym_step_abund, sym_step_ranges, num_states)
+
+    disc = app.get_discrete_matrix_from_standardized(gap_from_abund, bits, sample_names)
+    disc2 = app.get_discrete_matrix_from_standardized(gap_from_sub, bits, sample_names)
+    cont_disc = app.get_discrete_matrix_from_standardized(gap_from_cont, bits, sample_names)
+    sym_state_disc = app.get_discrete_matrix_from_standardized(gap_from_sym_state, bits, sample_names)
+    sym_step_disc = app.get_discrete_matrix_from_standardized(gap_from_sym_step, bits, sample_names)
+
+    print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, cont_abund, gap_from_cont, cont_ranges,
+                   sub_abund, gap_from_sub, sub_abund_ranges, sym_state_abund, sym_state_gap, sym_state_ranges,
+                   sym_step_abund, sym_step_gap, sym_step_ranges,
                    num_cols, tree_num, sample_names, roots, 0, filedata)
 
     mb_tree, mb_diffs = run_mr_bayes("state", tree_num, 0, disc, sample_names, tree, filedata, mrbayes_timeout)
@@ -683,7 +692,7 @@ def run_full_simulation(sample_trees, filedata, args, taxa_tree, taxa_tree_fixed
                                        filedata, args.brlen, args.mrbayes_timeout)
             celery_results.append(res)
             submit_count += 1
-            if submit_count == 10:
+            if submit_count == 20:
                 break
         else:
             run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, col, out_file, dist_file,
