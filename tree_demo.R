@@ -1,5 +1,6 @@
 library(ape)
 library(plotrix)
+options("scipen"=100, "digits"=4)
 rTraitDisc2 <-
     function(phy, model = "ER", k = if (is.matrix(model)) ncol(model) else 2,
              rate = 0.1, states = LETTERS[1:k], freq = rep(1/k, k),
@@ -111,13 +112,13 @@ get_state_model = function(num_states,rate) {
             }
         }
     }
-    print(mat)
+    #print(mat)
     return(mat)
 }
 
 get_er_model = function(num_states, rate) {
     mat = matrix(rep(rate, num_states**2), num_states)
-    print(mat)
+    #print(mat)
     mat
 }
 
@@ -134,7 +135,7 @@ get_restricted_er_model = function(num_states, rate) {
             }
         }
     }
-    print(mat)
+    #print(mat)
     mat
 }
 
@@ -153,11 +154,14 @@ rate = 1
 tree =  rtree(num_states)
 tree$edge.length = rep(0.5, length(tree$edge.length))
 er_model = get_er_model(num_states, rate)
+#print(er_model)
 data_er = get_matrix(cols, er_model)
 res_er_model = get_restricted_er_model(num_states, rate)
+#print(res_er_model)
 data_res_er = get_matrix(cols, res_er_model)
 data_cont = get_continuous_matrix(cols)
 state_model = get_state_model(num_states, rate)
+print(state_model)
 data_state = get_matrix(cols, state_model)
 
 #pdf(paste("tree_demo_", rate, ".pdf", sep=""), height=8.5, width=20)
