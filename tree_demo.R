@@ -149,7 +149,7 @@ get_continuous_matrix = function(cols) {
 
 num_states = 8
 cols = 1
-rate = 2
+rate = 1
 tree =  rtree(num_states)
 tree$edge.length = rep(0.5, length(tree$edge.length))
 er_model = get_er_model(num_states, rate)
@@ -160,7 +160,7 @@ data_cont = get_continuous_matrix(cols)
 state_model = get_state_model(num_states, rate)
 data_state = get_matrix(cols, state_model)
 
-pdf(paste("tree_demo_", rate, ".pdf", sep=""), height=8.5, width=20)
+#pdf(paste("tree_demo_", rate, ".pdf", sep=""), height=8.5, width=20)
 l = matrix(c(1,2,3,4,5,6,7,8), 4, 2, byrow = TRUE)
 #layout(l)
 data = list(data_er, data_res_er, data_cont, data_state)
@@ -179,7 +179,7 @@ for (i in 1:length(data)) {
     tiplabels(Y)
     plot.new()
     if (i!=3) {
-        addtable2plot(0,0.4,table=tables[i][[1]], xpad=1, title=paste("Q matrix, rate=", rate, sep=""), cex=0.8, hlines=T, vlines=T)
+        addtable2plot(0,0.4,table=tables[i][[1]], xpad=1, title=paste("Q matrix, rate=", rate, sep=""), cex=0.6, hlines=T, vlines=T)
     }
 }
-dev.off()
+#dev.off()
