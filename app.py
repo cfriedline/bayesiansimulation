@@ -27,6 +27,7 @@ from itertools import izip
 #mp_logger = mp.log_to_stderr()
 #mp_logger.setLevel(mp.SUBDEBUG)
 import logging
+import pandas as pd
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -1328,6 +1329,26 @@ def subsample_abundance_matrix(matrix, perc):
             row_sub[index] = val
         sub.append(row_sub)
     return sub
+
+
+def shuffle_abundance_matrix(matrix, perc):
+    """
+    shuffles the columns (otus) of an abundance matrix to destroy
+    tree structure
+    @param matrix: abundance matrix as list of lists
+    @param perc: percent of columns to shuffle
+    """
+    df = pd.DataFrame(matrix)
+    prob = perc/100.0
+    assert isinstance(df, pd.DataFrame)
+    assert len(matrix) == len(df)
+    shuffled = []
+    for col in df:
+        r = numpy.random.random()
+        if r < 0.5:
+            shuffled.append(col)
+            numpy.random.shuffle(df[col])
+    return ([list(x)[1:] for x in df.itertuples()], shuffled)
 
 
 def _count_unique(items):

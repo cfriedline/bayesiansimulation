@@ -76,5 +76,24 @@ class Tester(unittest.TestCase):
         print diffs
         assert diffs[0] == 0.0
 
+    def test_shuffle(self):
+        import pandas as pd
+        mat = []
+        rows = 10
+        cols = 3
+        for i in xrange(rows):
+            row = []
+            mat.append(row)
+            for j in xrange(cols):
+                row.append(i)
+        data_shuff, cols_shuff = app.shuffle_abundance_matrix(mat, 50)
+        if len(cols_shuff) > 0:
+            print "cols shuffled: %s" % cols_shuff
+            for row in data_shuff:
+                print row
+            assert mat != data_shuff
+        else:
+            assert mat == data_shuff
+
 
 
