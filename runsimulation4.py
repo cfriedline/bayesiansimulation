@@ -16,7 +16,8 @@ import sys
 import argparse
 import celery
 from celery import Celery
-from runsimulation4 import *  #workaround for celery
+#workaround for celery
+from runsimulation4 import *
 import tempfile
 import logging
 import billiard.exceptions
@@ -516,6 +517,7 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     bc_nj_tree, bc_nj_diffs = get_bc_nj(tree, abund, sample_names)
 
     new_ranges = get_column_ranges(numpy.array(abund))
+    assert new_ranges == range_abund_shuff
     gap_from_abund = app.restandardize_matrix(abund, new_ranges, num_states)
 
     cont_ranges = get_column_ranges(numpy.array(cont_abund))
