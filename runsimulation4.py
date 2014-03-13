@@ -156,6 +156,8 @@ def create_R():
 
 def get_column_ranges(data):
     ranges = []
+    if not isinstance(data, numpy.ndarray):
+        data = numpy.array(data)
     for col in data.T:
         minval = min(col)
         if minval < 0:
@@ -191,12 +193,14 @@ def print_ranges(ranges, prefix, num_cols, run, filedata):
             fh.write("%d\t%s\n" % (i, '\t'.join([str(int(elem)) for elem in range[0:2]])))
 
 
-def print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, cont_abund, gap_from_cont, cont_ranges,
+def print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, abund_shuff, cont_abund, gap_from_cont,
+                   cont_ranges,
                    sub_abund, gap_from_sub, sub_abund_ranges, sym_state_abund, sym_state_gap, sym_state_ranges,
                    res_er_abund, res_er_gap, res_er_ranges, num_cols, tree_num, sample_names, roots, i, filedata):
     print_matrix(data, "data", sample_names, num_cols, tree_num, True, roots, i, filedata)
     print_matrix(gap, "gap", sample_names, num_cols, tree_num, True, None, i, filedata)
     print_matrix(abund, "abund", sample_names, num_cols, tree_num, True, None, i, filedata)
+    print_matrix(abund_shuff, "abund_shuff", sample_names, num_cols, tree_num, True, None, i, filedata)
     print_matrix(gap_from_abund, "gap_abund", sample_names, num_cols, tree_num, True, None, i, filedata)
     print_matrix(cont_abund, "cont_abund", sample_names, num_cols, tree_num, True, None, i, filedata)
     print_matrix(gap_from_cont, "cont_gap", sample_names, num_cols, tree_num, True, None, i, filedata)
@@ -463,6 +467,12 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     gap_from_sub = app.restandardize_matrix(sub_abund, sub_abund_ranges, num_states)
     print_state_distribution("sub", gap_from_sub, num_cols, tree_num, sample_names, dist_file)
 
+    #shuffle abund matrix cols
+    abund_shuff, abund_shuff_cols = app.shuffle_abundance_matrix(abund, 50)
+    range_abund_shuff = get_column_ranges(abund_shuff)
+    gap_from_shuff = app.restandardize_matrix(abund_shuff, range_abund_shuff, num_states)
+    disc_shuff = app.get_discrete_matrix_from_standardized(gap_from_shuff, bits, sample_names)
+
     #restricted er model
     res_er_abund = app.get_abundance_matrix(res_er_gap, res_er_ranges, "gamma", num_states)
     res_er_ranges = get_column_ranges(numpy.array(res_er_abund))
@@ -504,6 +514,7 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     bc_pcoa_tree, bc_pcoa_diffs = get_bc_pcoa(tree, abund, sample_names)
     bc_cluster_tree, bc_cluster_diffs = get_bc_cluster(tree, abund, sample_names)
     bc_nj_tree, bc_nj_diffs = get_bc_nj(tree, abund, sample_names)
+
     new_ranges = get_column_ranges(numpy.array(abund))
     gap_from_abund = app.restandardize_matrix(abund, new_ranges, num_states)
 
@@ -519,13 +530,17 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
     cont_disc = app.get_discrete_matrix_from_standardized(gap_from_cont, bits, sample_names)
     sym_state_disc = app.get_discrete_matrix_from_standardized(gap_from_sym_state, bits, sample_names)
 
-    print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, cont_abund, gap_from_cont, cont_ranges,
+    print_matrices(data, gap, abund, abund_ranges, gap_from_abund, new_ranges, abund_shuff, cont_abund, gap_from_cont,
+                   cont_ranges,
                    sub_abund, gap_from_sub, sub_abund_ranges, sym_state_abund, sym_state_gap, sym_state_ranges,
                    res_er_abund, res_er_gap, res_er_ranges, num_cols, tree_num, sample_names, roots, 0, filedata)
 
     mb_tree, mb_diffs = run_mr_bayes("state", tree_num, 0, disc, sample_names, tree, filedata, mrbayes_timeout, "equal")
     mb_tree_sub, mb_diffs_sub = run_mr_bayes("sub", tree_num, 0, sub_disc, sample_names, tree, filedata,
                                              mrbayes_timeout, "equal")
+    mb_tree_shuff, mb_diffs_shuff = run_mr_bayes("shuff", tree_num, 0, disc_shuff, sample_names, tree, filedata,
+                                                 mrbayes_timeout, "equal")
+
     mb_tree_cont, mb_diffs_cont = run_mr_bayes("cont", tree_num, 0, cont_disc, sample_names, tree, filedata,
                                                mrbayes_timeout, "equal")
     mb_tree_sym_state, mb_diffs_sym_state = run_mr_bayes("sym_state", tree_num, 0, sym_state_disc, sample_names, tree,
@@ -541,29 +556,31 @@ def run_simulation(taxa_tree, taxa_tree_fixedbr, sample_tree, tree_num, num_cols
 
     # output
     try:
-        out_file.write("%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" %
-                       (tree_num, num_cols,
-                        get_tab_string(mb_diffs),
-                        get_tab_string(mb_diffs_sub),
-                        get_tab_string(mb_diffs_cont),
-                        get_tab_string(mb_diffs_sym_state),
-                        get_tab_string(mb_diffs_sym_state_gamma),
-                        get_tab_string(mb_diffs_res_er),
-                        get_tab_string(u_pcoa_diffs),
-                        get_tab_string(u_cluster_diffs),
-                        get_tab_string(u_nj_diffs),
-                        get_tab_string(w_pcoa_diffs),
-                        get_tab_string(w_cluster_diffs),
-                        get_tab_string(w_nj_diffs),
-                        get_tab_string(u_pcoa_diffs_norm),
-                        get_tab_string(u_cluster_diffs_norm),
-                        get_tab_string(u_nj_diffs_norm),
-                        get_tab_string(w_pcoa_diffs_norm),
-                        get_tab_string(w_cluster_diffs_norm),
-                        get_tab_string(w_nj_diffs_norm),
-                        get_tab_string(bc_pcoa_diffs),
-                        get_tab_string(bc_cluster_diffs),
-                        get_tab_string(bc_nj_diffs)))
+        out_file.write(
+            "%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" %
+            (tree_num, num_cols,
+             get_tab_string(mb_diffs),
+             get_tab_string(mb_diffs_sub),
+             get_tab_string(mb_diffs_shuff),
+             get_tab_string(mb_diffs_cont),
+             get_tab_string(mb_diffs_sym_state),
+             get_tab_string(mb_diffs_sym_state_gamma),
+             get_tab_string(mb_diffs_res_er),
+             get_tab_string(u_pcoa_diffs),
+             get_tab_string(u_cluster_diffs),
+             get_tab_string(u_nj_diffs),
+             get_tab_string(w_pcoa_diffs),
+             get_tab_string(w_cluster_diffs),
+             get_tab_string(w_nj_diffs),
+             get_tab_string(u_pcoa_diffs_norm),
+             get_tab_string(u_cluster_diffs_norm),
+             get_tab_string(u_nj_diffs_norm),
+             get_tab_string(w_pcoa_diffs_norm),
+             get_tab_string(w_cluster_diffs_norm),
+             get_tab_string(w_nj_diffs_norm),
+             get_tab_string(bc_pcoa_diffs),
+             get_tab_string(bc_cluster_diffs),
+             get_tab_string(bc_nj_diffs)))
     except:
         logger.error("Unexpected error in writing output", sys.exc_info())
         sys.exit()
@@ -598,6 +615,7 @@ def get_header():
     return "tree_num\tcols\t" \
            "mb_topo\tmb_symm\tmb_path\t" \
            "mb_topo_sub\tmb_symm_sub\tmb_path_sub\t" \
+           "mb_topo_shuff\tmb_symm_shuff\tmb_path_shuff\t" \
            "mb_topo_cont\tmb_symm_cont\tmb_path_cont\t" \
            "mb_topo_sym_state\tmb_symm_sym_state\tmb_path_sym_state\t" \
            "mb_topo_sym_state_gamma\tmb_symm_sym_state_gamma\tmb_path_sym_state_gamma\t" \
