@@ -45,7 +45,10 @@ bits = 3
 rate = 1.0
 gamma_shape = 1
 gamma_scale = 1000
-sigma = 0.5  #for BM
+
+#for BM
+sigma = 0.5
+
 
 if 'godel' in hostname:
     mpi = '/usr/global/openmpi-1.5.3-w-psm/bin/mpirun'
