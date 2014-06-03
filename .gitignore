@@ -6,3 +6,4 @@ tmp*
 *.pdf
 .Rhistory
 .RData
+*#
