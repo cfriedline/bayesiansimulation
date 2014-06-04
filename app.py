@@ -429,11 +429,12 @@ def create_tree(num_tips, type):
     logger.info("Creating %s tree in %s" % (type, __name__))
     robjects.globalenv['numtips'] = num_tips
     robjects.globalenv['treetype'] = type
+    name = _get_random_string(20)
     if type == "T":
-        r("t = rtree(numtips, rooted=T, tip.label=paste(treetype, seq(1:(numtips)), sep=''))")
+        r("%s = rtree(numtips, rooted=T, tip.label=paste(treetype, seq(1:(numtips)), sep=''))" % name)
     else:
-        r("t = rtree(numtips, rooted=F, tip.label=paste(treetype, seq(1:(numtips)), sep=''))")
-    tree = r['t']
+        r("%s = rtree(numtips, rooted=F, tip.label=paste(treetype, seq(1:(numtips)), sep=''))" % name)
+    tree = r[name]
     return ape_to_dendropy(tree)
 
 
