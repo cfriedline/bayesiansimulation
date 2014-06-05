@@ -28,6 +28,7 @@ from itertools import izip
 #mp_logger.setLevel(mp.SUBDEBUG)
 import logging
 import pandas as pd
+import time
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -426,6 +427,8 @@ def create_tree(num_tips, type):
     @rtype: dendropy.Tree
     """
     r = robjects.r
+    set_seed = r('set.seed')
+    set_seed(int((time.time()+os.getpid()*1000)))
     logger.info("Creating %s tree in %s" % (type, __name__))
     robjects.globalenv['numtips'] = num_tips
     robjects.globalenv['treetype'] = type
